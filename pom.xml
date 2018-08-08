@@ -16,24 +16,9 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>org.springframework.data</groupId>
-			<artifactId>spring-data-jpa</artifactId>
-			<version>2.0.5.RELEASE</version>
-		</dependency>
-		<dependency>
 			<groupId>org.hibernate</groupId>
 			<artifactId>hibernate-entitymanager</artifactId>
 			<version>${hibernate.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.hibernate</groupId>
-			<artifactId>hibernate-hikaricp</artifactId>
-			<version>5.2.17.Final</version>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-orm</artifactId>
-			<version>${spring.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.hibernate</groupId>
@@ -46,11 +31,6 @@
 			<version>1.7.22</version>
 		</dependency>
 
-		<dependency>
-			<groupId>com.zaxxer</groupId>
-			<artifactId>HikariCP</artifactId>
-			<version>2.7.4</version>
-		</dependency>
 
 		<dependency>
 			<groupId>junit</groupId>
@@ -58,6 +38,11 @@
 			<version>4.11</version>
 		</dependency>
 
+		<dependency>
+			<groupId>omni-dms-impl</groupId>
+			<artifactId>omni-dms-impl</artifactId>
+			<version>1.0</version>
+		</dependency>
 	</dependencies>
 
 
