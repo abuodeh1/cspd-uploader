@@ -1,27 +1,46 @@
 package cspd;
+
+import java.util.Scanner;
+
 import javax.persistence.EntityManager;
-import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+
+import cspd.entities.BatchDetails;
 
 public class CSPDTest {
 
 	private static EntityManager cspdEM = EntityManagerUtil.getEntityManager("cspd");
-	
-	private static EntityManager omnidocsEM = EntityManagerUtil.getEntityManager("omnidocs");
-	
+
+	// private static EntityManager omnidocsEM =
+	// EntityManagerUtil.getEntityManager("omnidocs");
+
 	public static void main(String[] args) {
 
-		cspdEM.getTransaction().begin();
-		
-		Query q = cspdEM.createNativeQuery("SELECT BatchId FROM BatchDetails");
-		q.getResultList().stream().forEach(record -> System.out.println("BatchID: " + record));
-		
-		omnidocsEM.getTransaction().begin();
-		
-		omnidocsEM.close();
-		cspdEM.close();
-		
-		System.exit(0);
-		
+		if ((args.length != 0) && args[0].equals("console")) {
+
+			try (Scanner reader = new Scanner(System.in)) {
+
+				String batchID = null;
+
+				cspdEM.getTransaction().begin();
+
+				while (!(batchID = reader.nextLine()).equals("bye")) {
+
+					TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findById",
+							BatchDetails.class);
+					batchDetailsTypeQuery.setParameter("id", Integer.valueOf(batchID) );
+					batchDetailsTypeQuery.getResultList().stream().forEach(
+							record -> System.out.println("BatchID: " + record.getSerialNumber() + " - " + record.getFileNumber()));
+
+
+				}
+
+				cspdEM.close();
+				
+				System.exit(0);
+			}
+		}
+
 	}
 
 }
