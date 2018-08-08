@@ -26,6 +26,10 @@ public class CSPDTest {
 
 				while (!(batchID = reader.nextLine()).equals("bye")) {
 
+					/**
+					 * Fetch all BatchDetails records by batchID
+					 */
+					
 					TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findById",
 							BatchDetails.class);
 					batchDetailsTypeQuery.setParameter("id", Integer.valueOf(batchID) );
