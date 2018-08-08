@@ -10,6 +10,8 @@ import java.util.Date;
 
 import javax.persistence.Basic;
 import javax.persistence.Column;
+import javax.persistence.ColumnResult;
+import javax.persistence.ConstructorResult;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
@@ -17,19 +19,44 @@ import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
+import javax.persistence.SqlResultSetMapping;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+
+import cspd.core.CspdMetadata;
 
 /**
  *
  * @author mabuodeh
  */
+
+@SqlResultSetMapping(
+        name = "CspdMetadataMapping",
+        classes = @ConstructorResult(
+                targetClass = CspdMetadata.class,
+                columns = {
+                    @ColumnResult(name = "OfficeCode"),
+                    @ColumnResult(name = "OfficeName"),
+                    @ColumnResult(name = "FileType", type=Integer.class),
+                    @ColumnResult(name = "OldSerial"),
+                    @ColumnResult(name = "Prefix"),
+                    @ColumnResult(name = "Year"),
+                    @ColumnResult(name = "SerialNumber"),
+                    @ColumnResult(name = "Part", type=Integer.class),
+                    @ColumnResult(name = "FirstName", type=String.class),
+                    @ColumnResult(name = "SecondName", type=String.class),
+                    @ColumnResult(name = "ThirdName", type=String.class),
+                    @ColumnResult(name = "FamilyName", type=String.class),
+                    @ColumnResult(name = "FileNumber"),
+                    @ColumnResult(name = "FolderClassCode"),
+                    @ColumnResult(name = "FolderClassText")}))
+
 @Entity
 @Table(name = "BatchDetails")
 @NamedQueries({
     @NamedQuery(name = "BatchDetails.findAll", query = "SELECT b FROM BatchDetails b"),
-    @NamedQuery(name = "BatchDetails.findById", query = "SELECT b FROM BatchDetails b WHERE b.id = :id"),
+    @NamedQuery(name = "BatchDetails.findById", query = "SELECT b FROM BatchDetails b WHERE b.batchId.id = :id"),
     @NamedQuery(name = "BatchDetails.findByFileNumber", query = "SELECT b FROM BatchDetails b WHERE b.fileNumber = :fileNumber"),
     @NamedQuery(name = "BatchDetails.findByYear", query = "SELECT b FROM BatchDetails b WHERE b.year = :year"),
     @NamedQuery(name = "BatchDetails.findByFileStatus", query = "SELECT b FROM BatchDetails b WHERE b.fileStatus = :fileStatus"),
