@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -22,7 +23,8 @@ import etech.dms.exception.CabinetException;
 import etech.omni.OmniService;
 import etech.omni.core.DataDefinition;
 import etech.omni.core.Folder;
-
+import java.nio.file.Path;
+import java.nio.file.Paths;
 public class CSPDTest {
 
 	private static EntityManager cspdEM = null;
@@ -107,25 +109,35 @@ public class CSPDTest {
 								}
 							});
 
+							/* move Opex Folder */
+
 							String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + opexFolder.getName();
 							File transferFolder = new File(transferFolderDest);
+							
 							if (transferFolder.exists()) {
-								SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmssSSS");
+								
+								SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
 								String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
-
-								transferFolder.renameTo(new File(transferFolder.getName() + " - " + currentDateTime));
+								
+								
+								boolean rename=	transferFolder.renameTo(new File((transferFolder +" - "+currentDateTime)));
+								System.out.println(rename);
 							}
-
+							
+							
 							transferFolder.mkdir();
 
 							for (int i = 0; i < files.length; i++) {
 
 								omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
 
-								Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+								Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(),
+										StandardCopyOption.REPLACE_EXISTING);
 							}
 
-							opexFolder.deleteOnExit();
+						/*	boolean deleteFolder = opexFolder.delete();
+							System.out.println(deleteFolder);*/
+							
 
 						} catch (Exception e) {
 							e.printStackTrace();
@@ -299,8 +311,8 @@ public class CSPDTest {
 	private static CspdMetadata fetchCspdMetadata(String serialNumber, int part) throws Exception {
 
 		String metadataQuery = "SELECT b.OfficeCode, " + "	   oe.OfficeName, " + "	   b.FileType, " + "	   dbo.GetFileOldSerial(bd.FileNumber, b.FileType) AS OldSerial, "
-				+ "	   dbo.GetFilePrefix(bd.FileNumber, b.FileType) AS Prefix, " + "	   bd.Year, " + "	   dbo.GetNewSerial(bd.SerialNumber) AS SerialNumber, " + "	   bd.Part, "
-				+ "	   bd.FirstName, " + "	   bd.SecondName, " + "	   bd.ThirdName, " + "	   bd.FamilyName, " + "	   bd.FileNumber, "
+				+ "	   dbo.GetFilePrefix(bd.FileNumber, b.FileType) AS Prefix, " + "	   bd.Year, " + "	   dbo.GetNewSerial(bd.SerialNumber) AS SerialNumber, "
+				+ "	   bd.Part, " + "	   bd.FirstName, " + "	   bd.SecondName, " + "	   bd.ThirdName, " + "	   bd.FamilyName, " + "	   bd.FileNumber, "
 				+ "	   dbo.GetFolderClassCode(bd.SerialNumber) AS FolderClassCode, " + "	   dbo.GetFolderClassText(bd.SerialNumber) AS FolderClassText  " + "FROM Batches b  "
 				+ "	 INNER JOIN BatchDetails bd  " + "		ON b.Id=bd.BatchId  " + "			INNER JOIN OldOffices oe  " + "			ON b.OldOfficeCode = oe.OfficeCode  "
 				+ "WHERE SerialNumber = :serialNumber  " + "AND   Part = :part ";
