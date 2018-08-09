@@ -1,6 +1,7 @@
 package cspd;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -25,34 +26,45 @@ import etech.omni.core.Folder;
 
 public class CSPDTest {
 
-	private static EntityManager cspdEM = EntityManagerUtil.getEntityManager("cspd");
+	private static EntityManager cspdEM = null;
 	private static Properties props;
 	DataDefinition dataDefinition = new DataDefinition();
 	// private static EntityManager omnidocsEM =
 	// EntityManagerUtil.getEntityManager("omnidocs");
 
-	public static void main(String[] args) throws FileNotFoundException {
+	public static void main(String[] args) throws Exception {
 
-		File fileProps = new File("application.properties" );
+		File fileProps = new File("application.properties");
 
 		FileInputStream in = new FileInputStream(fileProps);
-		
+
 		props = new Properties();
-		
+
+		OmniService omniService = null;
 		try {
 			props.load(in);
-			
+
 			in.close();
+
+			cspdEM = EntityManagerUtil.getEntityManager("cspd");
+
+			omniService = getOmniService();
+
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
+
 			e1.printStackTrace();
+
+			System.exit(0);
 		}
 
-		OmniService omniService = getOmniService();
+		if (args.length == 0){
+			
+			System.err.println("Usage: java -jar cspd-uploader console");
+			
+			System.exit(1);
+			
+		}
 		
-
-		List<Folder> preparedOmnidocsFolderToUploadList = new ArrayList<>();
-
 		if ((args.length != 0) && args[0].equals("console")) {
 
 			try (Scanner reader = new Scanner(System.in)) {
@@ -82,40 +94,68 @@ public class CSPDTest {
 					/**
 					 * Fetch folder meta data by serialNumber and part for each batchDetials record
 					 */
+					Folder folder = null;
 					Iterator<BatchDetails> batchDetailsIterator = batchDetails.iterator();
 					while (batchDetailsIterator.hasNext()) {
 						BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
 
-						
-						/**
-						 * Perpare folder data definition
-						 */
-
 						try {
+
+							/* Prepare omnidocs folder */
+							 folder = perpareOmniFolder(omniService, batch.getFileType(),
+							 batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
+
+							// /*checking destination have the same folder*/
+
+							String scannerdist = props.getProperty("opex.scanner.output");
+							String folderName = folder.getFolderName();
+
+							File opexFolder = new File(scannerdist + System.getProperty("file.separator") + folderName);
+
+							if (!opexFolder.exists()) {
+								throw new Exception("Opex folder doesn't exist");
+							}
+
+							if (props.getProperty("omnidocs.deleteFolderIfExist").equalsIgnoreCase("true")) {
+								List<Folder> omniFolder = omniService.getFolderUtility().findFolderByName(props.getProperty("opex.type." + batch.getFileType()), folderName);
+								if (omniFolder.size() > 0) {
+
+									omniService.getFolderUtility().delete(omniFolder.get(0).getFolderIndex());
+
+								}
+							}
+
+							/* upload folder into omnidocs */
+							Folder addedFolder = omniService.getFolderUtility().addFolder(folder.getParentFolderIndex(), folder);
+
+							/* upload documents */
+
+							File[] files = opexFolder.listFiles(new FileFilter() {
+								@Override
+								public boolean accept(File file) {
+									if (file.isDirectory())
+										return false;
+
+									return true;
+								}
+							});
 							
-							DataDefinition dataDefinition = perpareDatadefinition(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
+							for (int i = 0; i < files.length; i++) {
+								omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
+							}
 							
-							System.out.println(dataDefinition.toString());
-						}catch (Exception e) {
+
+						} catch (Exception e) {
 							e.printStackTrace();
-							
+							System.out.println("...");
 						}
-
-						
-						/**
-						 * Prepare omnidocs folder
-						 */
-
-						/**
-						 * add prepared omnidocs folder to preparedOmnidocsFolderToUploadList
-						 */
 
 					}
 
 				}
 
 				omniService.complete();
-				
+
 				cspdEM.close();
 
 				System.exit(0);
@@ -130,7 +170,7 @@ public class CSPDTest {
 		String omniPassword = props.getProperty("omnidocs.omniUserPassword");
 		int omniPort = Integer.valueOf(props.getProperty("omnidocs.port"));
 		String omniCabinet = props.getProperty("omnidocs.cabinet");
-		
+
 		OmniService omniService = new OmniService(host, omniPort, true);
 		try {
 			omniService.openCabinetSession(omniUser, omniPassword, omniCabinet, false, "S");
@@ -138,14 +178,18 @@ public class CSPDTest {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-		
+
 		return omniService;
 	}
 
-	private static DataDefinition perpareDatadefinition(OmniService omniService, int fileType, String serialNumber, int part) throws Exception{
+	private static Folder perpareOmniFolder(OmniService omniService, int fileType, String serialNumber, int part) throws Exception {
 		CspdMetadata cspdMetadata = null;
+		Folder folder = new Folder();
 		DataDefinition dataDefinition = null;
 		try {
+			folder.setFolderName(serialNumber.concat("%" + part));
+			folder.setParentFolderIndex(props.getProperty("opex.type." + fileType));
+
 			cspdMetadata = fetchCspdMetadata(serialNumber, part);
 
 			switch (fileType) {
@@ -175,6 +219,7 @@ public class CSPDTest {
 				break;
 
 			case 2:
+
 				dataDefinitionName = props.getProperty("omnidocs.dcCivil");
 
 				dataDefinition = omniService.getDataDefinitionUtility().findDataDefinitionByName(dataDefinitionName);
@@ -191,6 +236,7 @@ public class CSPDTest {
 				break;
 
 			case 3:
+
 				dataDefinitionName = props.getProperty("omnidocs.dcVital");
 
 				dataDefinition = omniService.getDataDefinitionUtility().findDataDefinitionByName(dataDefinitionName);
@@ -205,6 +251,7 @@ public class CSPDTest {
 				break;
 
 			case 4:
+
 				dataDefinitionName = props.getProperty("omnidocs.dcEmbassiess");
 
 				dataDefinition = omniService.getDataDefinitionUtility().findDataDefinitionByName(dataDefinitionName);
@@ -217,6 +264,7 @@ public class CSPDTest {
 				break;
 
 			case 5:
+
 				dataDefinitionName = props.getProperty("omnidocs.dcVitalNonJordandian");
 
 				dataDefinition = omniService.getDataDefinitionUtility().findDataDefinitionByName(dataDefinitionName);
@@ -232,11 +280,14 @@ public class CSPDTest {
 
 				throw new Exception();
 			}
+
+			folder.setDataDefinition(dataDefinition);
+
 		} catch (Exception e) {
 			throw new Exception("Unable to fetch meta data");
 		}
-		
-		return dataDefinition;
+
+		return folder;
 
 	}
 
@@ -266,6 +317,10 @@ public class CSPDTest {
 		}
 
 		return metadata.get(0);
+	}
+
+	public void checkdest() {
+
 	}
 
 }
