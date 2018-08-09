@@ -3,9 +3,9 @@ package cspd;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -19,7 +19,6 @@ import cspd.core.CspdMetadata;
 import cspd.entities.BatchDetails;
 import cspd.entities.Batches;
 import etech.dms.exception.CabinetException;
-import etech.dms.exception.DataDefinitionException;
 import etech.omni.OmniService;
 import etech.omni.core.DataDefinition;
 import etech.omni.core.Folder;
@@ -28,43 +27,12 @@ public class CSPDTest {
 
 	private static EntityManager cspdEM = null;
 	private static Properties props;
-	DataDefinition dataDefinition = new DataDefinition();
-	// private static EntityManager omnidocsEM =
-	// EntityManagerUtil.getEntityManager("omnidocs");
+	private static OmniService omniService = null;
 
 	public static void main(String[] args) throws Exception {
 
-		File fileProps = new File("application.properties");
+		prepareResources();
 
-		FileInputStream in = new FileInputStream(fileProps);
-
-		props = new Properties();
-
-		OmniService omniService = null;
-		try {
-			props.load(in);
-
-			in.close();
-
-			cspdEM = EntityManagerUtil.getEntityManager("cspd");
-
-			omniService = getOmniService();
-
-		} catch (IOException e1) {
-
-			e1.printStackTrace();
-
-			System.exit(0);
-		}
-
-		if (args.length == 0){
-			
-			System.err.println("Usage: java -jar cspd-uploader console");
-			
-			System.exit(1);
-			
-		}
-		
 		if ((args.length != 0) && args[0].equals("console")) {
 
 			try (Scanner reader = new Scanner(System.in)) {
@@ -102,8 +70,7 @@ public class CSPDTest {
 						try {
 
 							/* Prepare omnidocs folder */
-							 folder = perpareOmniFolder(omniService, batch.getFileType(),
-							 batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
+							folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
 
 							// /*checking destination have the same folder*/
 
@@ -139,27 +106,65 @@ public class CSPDTest {
 									return true;
 								}
 							});
-							
-							for (int i = 0; i < files.length; i++) {
-								omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
+
+							String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + opexFolder.getName();
+							File transferFolder = new File(transferFolderDest);
+							if (transferFolder.exists()) {
+								SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmssSSS");
+								String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
+
+								transferFolder.renameTo(new File(transferFolder.getName() + " - " + currentDateTime));
 							}
-							
+
+							transferFolder.mkdir();
+
+							for (int i = 0; i < files.length; i++) {
+
+								omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
+
+								Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+							}
+
+							opexFolder.deleteOnExit();
 
 						} catch (Exception e) {
 							e.printStackTrace();
-							System.out.println("...");
 						}
 
 					}
 
 				}
 
-				omniService.complete();
-
-				cspdEM.close();
-
-				System.exit(0);
+				closeResourcesAndExit();
 			}
+		}
+	}
+
+	private static void closeResourcesAndExit() {
+		omniService.complete();
+
+		cspdEM.close();
+
+		System.exit(0);
+	}
+
+	private static void prepareResources() {
+
+		try {
+			File fileProps = new File("application.properties");
+			FileInputStream in = new FileInputStream(fileProps);
+			props = new Properties();
+			props.load(in);
+			in.close();
+
+			cspdEM = EntityManagerUtil.getEntityManager("cspd");
+
+			omniService = getOmniService();
+
+		} catch (Exception e) {
+			e.printStackTrace();
+
+			System.exit(0);
 		}
 	}
 
@@ -294,8 +299,8 @@ public class CSPDTest {
 	private static CspdMetadata fetchCspdMetadata(String serialNumber, int part) throws Exception {
 
 		String metadataQuery = "SELECT b.OfficeCode, " + "	   oe.OfficeName, " + "	   b.FileType, " + "	   dbo.GetFileOldSerial(bd.FileNumber, b.FileType) AS OldSerial, "
-				+ "	   dbo.GetFilePrefix(bd.FileNumber, b.FileType) AS Prefix, " + "	   bd.Year, " + "	   dbo.GetNewSerial(bd.SerialNumber) AS SerialNumber, "
-				+ "	   bd.Part, " + "	   bd.FirstName, " + "	   bd.SecondName, " + "	   bd.ThirdName, " + "	   bd.FamilyName, " + "	   bd.FileNumber, "
+				+ "	   dbo.GetFilePrefix(bd.FileNumber, b.FileType) AS Prefix, " + "	   bd.Year, " + "	   dbo.GetNewSerial(bd.SerialNumber) AS SerialNumber, " + "	   bd.Part, "
+				+ "	   bd.FirstName, " + "	   bd.SecondName, " + "	   bd.ThirdName, " + "	   bd.FamilyName, " + "	   bd.FileNumber, "
 				+ "	   dbo.GetFolderClassCode(bd.SerialNumber) AS FolderClassCode, " + "	   dbo.GetFolderClassText(bd.SerialNumber) AS FolderClassText  " + "FROM Batches b  "
 				+ "	 INNER JOIN BatchDetails bd  " + "		ON b.Id=bd.BatchId  " + "			INNER JOIN OldOffices oe  " + "			ON b.OldOfficeCode = oe.OfficeCode  "
 				+ "WHERE SerialNumber = :serialNumber  " + "AND   Part = :part ";
