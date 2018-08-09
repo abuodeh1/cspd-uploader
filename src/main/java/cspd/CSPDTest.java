@@ -33,7 +33,7 @@ public class CSPDTest {
 
 	public static void main(String[] args) throws FileNotFoundException {
 
-		File fileProps = new File(" application.properties" );
+		File fileProps = new File("application.properties" );
 
 		FileInputStream in = new FileInputStream(fileProps);
 		
@@ -94,8 +94,9 @@ public class CSPDTest {
 						try {
 							
 							DataDefinition dataDefinition = perpareDatadefinition(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
-						}
-						catch (Exception e) {
+							
+							System.out.println(dataDefinition.toString());
+						}catch (Exception e) {
 							e.printStackTrace();
 							
 						}
@@ -124,12 +125,11 @@ public class CSPDTest {
 
 	private static OmniService getOmniService() {
 		String host = props.getProperty("omnidocs.host");
-		int port = Integer.valueOf(props.getProperty("omnidocs.port"));
-		
-		String omniUser = props.getProperty("omnidocs.host");
-		String omniPassword = props.getProperty("omnidocs.host");
-		int omniPort = Integer.valueOf(props.getProperty("omnidocs.host"));
-		String omniCabinet = props.getProperty("omnidocs.host");
+
+		String omniUser = props.getProperty("omnidocs.omniUser");
+		String omniPassword = props.getProperty("omnidocs.omniUserPassword");
+		int omniPort = Integer.valueOf(props.getProperty("omnidocs.port"));
+		String omniCabinet = props.getProperty("omnidocs.cabinet");
 		
 		OmniService omniService = new OmniService(host, omniPort, true);
 		try {
@@ -144,10 +144,10 @@ public class CSPDTest {
 
 	private static DataDefinition perpareDatadefinition(OmniService omniService, int fileType, String serialNumber, int part) throws Exception{
 		CspdMetadata cspdMetadata = null;
+		DataDefinition dataDefinition = null;
 		try {
 			cspdMetadata = fetchCspdMetadata(serialNumber, part);
 
-			DataDefinition dataDefinition = null;
 			switch (fileType) {
 
 			case 1:
@@ -236,7 +236,7 @@ public class CSPDTest {
 			throw new Exception("Unable to fetch meta data");
 		}
 		
-		return perpareDatadefinition(omniService, fileType, serialNumber, part);
+		return dataDefinition;
 
 	}
 
