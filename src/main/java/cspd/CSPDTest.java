@@ -46,17 +46,17 @@ public class CSPDTest {
 	public static void main(String[] args) {
 
 		prepareResources();
-
+	
 		if ((args.length != 0) && args[0].equals("console")) {
 
 			try (Scanner reader = new Scanner(System.in)) {
 
 				String batchID = null;
 
-				cspdEM.getTransaction().begin();
-
 				while (!(batchID = reader.nextLine()).equalsIgnoreCase("bye")) {
 
+					cspdEM.getTransaction().begin();
+					
 					/*
 					 * Fetch all Batch records by id
 					 */
@@ -67,7 +67,7 @@ public class CSPDTest {
 
 					/**
 					 * Fetch all BatchDetails records by batchID
-					 */
+					 **/
 
 					TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findById", BatchDetails.class);
 					batchDetailsTypeQuery.setParameter("id", Integer.valueOf(batchID));
@@ -75,10 +75,12 @@ public class CSPDTest {
 
 					/***
 					 * Fetch folder meta data by serialNumber and part for each batchDetials record
-					 */
+					 ***/
+
 					Folder folder = null;
 					Iterator<BatchDetails> batchDetailsIterator = batchDetails.iterator();
 					while (batchDetailsIterator.hasNext()) {
+
 						BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
 
 						/*** Prepare omnidocs folder ***/
@@ -108,7 +110,8 @@ public class CSPDTest {
 									omniService.getFolderUtility().delete(omniFolder.get(0).getFolderIndex());
 								}
 							} catch (FolderException e) {
-								cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to find or delete the exist of omnidocs folder"));
+								cspdEM.persist(
+										new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to find or delete the exist of omnidocs folder"));
 								continue;
 							}
 						}
@@ -121,20 +124,20 @@ public class CSPDTest {
 							cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to create the omnidocs folder"));
 							continue;
 						}
-			
+
 						/* upload documents */
 						File[] files = opexFolder.listFiles(new FileFilter() {
-							
+
 							@Override
 							public boolean accept(File file) {
-	
+
 								if (file.isDirectory())
-									
+
 									return false;
-								
-								if(!file.getName().toLowerCase().endsWith(".pdf"))
+
+								if (!file.getName().toLowerCase().endsWith(".pdf"))
 									return false;
-								
+
 								return true;
 							}
 						});
@@ -153,18 +156,18 @@ public class CSPDTest {
 
 						transferFolder.mkdir();
 
-						if(files.length == 0) {
+						if (files.length == 0) {
 							cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "The oepx folder is empty"));
 							continue;
 						}
-						
+
 						for (int i = 0; i < files.length; i++) {
 
 							try {
 								omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
+
+								Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
 								
-								Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(),
-										StandardCopyOption.REPLACE_EXISTING);
 							} catch (DocumentException e) {
 								cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to upload the opex folder's document"));
 								continue;
@@ -172,32 +175,35 @@ public class CSPDTest {
 								cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to upload the opex folder's document"));
 								continue;
 							}
-							
+
 							cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), true, false, true, null));
-							
+
 							uploadCleanup(transferFolderDest, opexFolder);
 						}
 
 					}
-
+					
+					cspdEM.getTransaction().commit();
+					
 				}
 
 				closeResourcesAndExit();
 			}
 		}
+
 	}
 
 	private static void uploadCleanup(String transferFolderDest, File opexFolder) {
-		
+
 		File[] files = opexFolder.listFiles();
 		for (int i = 0; i < files.length; i++) {
 
 			try {
 				Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(),
 						StandardCopyOption.REPLACE_EXISTING);
-				
+
 			} catch (IOException e) {
-				
+
 			}
 		}
 		opexFolder.delete();
@@ -206,7 +212,7 @@ public class CSPDTest {
 	private static void closeResourcesAndExit() {
 
 		omniService.complete();
-		//cspdEM.getTransaction().commit();
+		
 		cspdEM.close();
 
 		System.exit(0);
@@ -221,9 +227,9 @@ public class CSPDTest {
 			props.load(in);
 			in.close();
 
-			cspdEM = EntityManagerUtil.getEntityManager("cspd");
-
 			omniService = getOmniService();
+			
+			cspdEM = EntityManagerUtil.getEntityManager("cspd");
 
 		} catch (Exception e) {
 			e.printStackTrace();
