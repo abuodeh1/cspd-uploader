@@ -3,9 +3,12 @@ package cspd;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -15,23 +18,32 @@ import java.util.Scanner;
 import javax.persistence.EntityManager;
 import javax.persistence.Query;
 import javax.persistence.TypedQuery;
+import javax.swing.JFileChooser;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 import cspd.core.CspdMetadata;
 import cspd.entities.BatchDetails;
 import cspd.entities.Batches;
+import cspd.entities.LogStatus;
+import cspd.entities.ProcessLog;
 import etech.dms.exception.CabinetException;
+import etech.dms.exception.DocumentException;
+import etech.dms.exception.FolderException;
 import etech.omni.OmniService;
 import etech.omni.core.DataDefinition;
 import etech.omni.core.Folder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
 public class CSPDTest {
 
 	private static EntityManager cspdEM = null;
 	private static Properties props;
 	private static OmniService omniService = null;
+	private static LogStatus logStatus;
+	private static String comment;
 
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) {
 
 		prepareResources();
 
@@ -69,78 +81,101 @@ public class CSPDTest {
 					while (batchDetailsIterator.hasNext()) {
 						BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
 
+						/* Prepare omnidocs folder */
 						try {
-
-							/* Prepare omnidocs folder */
 							folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
+						} catch (Exception e) {
+							cspdEM.persist(new ProcessLog(new Date(), batchID, batchDetailsRecord.getSerialNumber() + "%" + batchDetailsRecord.getPart(), false, false, false,
+									"Opex folder doesn't exist"));
+							continue;
+						}
 
-							// /*checking destination have the same folder*/
+						// /*checking destination have the same folder*/
+						String scannerdist = props.getProperty("opex.scanner.output");
+						String folderName = folder.getFolderName();
 
-							String scannerdist = props.getProperty("opex.scanner.output");
-							String folderName = folder.getFolderName();
+						File opexFolder = new File(scannerdist + System.getProperty("file.separator") + folderName);
 
-							File opexFolder = new File(scannerdist + System.getProperty("file.separator") + folderName);
+						if (!opexFolder.exists()) {
+							cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Opex folder doesn't exist"));
+							continue;
+						}
 
-							if (!opexFolder.exists()) {
-								throw new Exception("Opex folder doesn't exist");
-							}
-
-							if (props.getProperty("omnidocs.deleteFolderIfExist").equalsIgnoreCase("true")) {
+						if (props.getProperty("omnidocs.deleteFolderIfExist").equalsIgnoreCase("true")) {
+							try {
 								List<Folder> omniFolder = omniService.getFolderUtility().findFolderByName(props.getProperty("opex.type." + batch.getFileType()), folderName);
 								if (omniFolder.size() > 0) {
-
 									omniService.getFolderUtility().delete(omniFolder.get(0).getFolderIndex());
-
 								}
+							} catch (FolderException e) {
+								cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to find or delete the exist of omnidocs folder"));
+								continue;
 							}
+						}
 
-							/* upload folder into omnidocs */
-							Folder addedFolder = omniService.getFolderUtility().addFolder(folder.getParentFolderIndex(), folder);
-
-							/* upload documents */
-
-							File[] files = opexFolder.listFiles(new FileFilter() {
-								@Override
-								public boolean accept(File file) {
-									if (file.isDirectory())
-										return false;
-
-									return true;
-								}
-							});
-
-							/* move Opex Folder */
-
-							String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + opexFolder.getName();
-							File transferFolder = new File(transferFolderDest);
+						/* upload folder into omnidocs */
+						Folder addedFolder = null;
+						try {
+							addedFolder = omniService.getFolderUtility().addFolder(folder.getParentFolderIndex(), folder);
+						} catch (FolderException e) {
+							cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to create the omnidocs folder"));
+							continue;
+						}
+			
+						/* upload documents */
+						File[] files = opexFolder.listFiles(new FileFilter() {
 							
-							if (transferFolder.exists()) {
+							@Override
+							public boolean accept(File file) {
+	
+								if (file.isDirectory())
+									
+									return false;
 								
-								SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
-								String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
+								if(!file.getName().toLowerCase().endsWith(".pdf"))
+									return false;
 								
-								
-								boolean rename=	transferFolder.renameTo(new File((transferFolder +" - "+currentDateTime)));
-								System.out.println(rename);
+								return true;
 							}
-							
-							
-							transferFolder.mkdir();
+						});
 
-							for (int i = 0; i < files.length; i++) {
+						/* move Opex Folder */
+						String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + opexFolder.getName();
+						File transferFolder = new File(transferFolderDest);
 
+						if (transferFolder.exists()) {
+
+							SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
+							String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
+
+							boolean rename = transferFolder.renameTo(new File((transferFolder + " - " + currentDateTime)));
+						}
+
+						transferFolder.mkdir();
+
+						if(files.length == 0) {
+							cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "The oepx folder is empty"));
+							continue;
+						}
+						
+						for (int i = 0; i < files.length; i++) {
+
+							try {
 								omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
-
+								
 								Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(),
 										StandardCopyOption.REPLACE_EXISTING);
+							} catch (DocumentException e) {
+								cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to upload the opex folder's document"));
+								continue;
+							} catch (IOException e) {
+								cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to upload the opex folder's document"));
+								continue;
 							}
-
-						/*	boolean deleteFolder = opexFolder.delete();
-							System.out.println(deleteFolder);*/
 							
-
-						} catch (Exception e) {
-							e.printStackTrace();
+							cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), true, false, true, null));
+							
+							uploadCleanup(transferFolderDest, opexFolder);
 						}
 
 					}
@@ -152,9 +187,26 @@ public class CSPDTest {
 		}
 	}
 
-	private static void closeResourcesAndExit() {
-		omniService.complete();
+	private static void uploadCleanup(String transferFolderDest, File opexFolder) {
+		
+		File[] files = opexFolder.listFiles();
+		for (int i = 0; i < files.length; i++) {
 
+			try {
+				Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(),
+						StandardCopyOption.REPLACE_EXISTING);
+				
+			} catch (IOException e) {
+				
+			}
+		}
+		opexFolder.delete();
+	}
+
+	private static void closeResourcesAndExit() {
+
+		omniService.complete();
+		cspdEM.getTransaction().commit();
 		cspdEM.close();
 
 		System.exit(0);

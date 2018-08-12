@@ -13,6 +13,8 @@ import javax.persistence.Basic;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.NamedQueries;
@@ -23,224 +25,141 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
-/**
- *
- * @author mabuodeh
- */
 @Entity
 @Table(name = "ProcessLog")
-@NamedQueries({
-    @NamedQuery(name = "ProcessLog.findAll", query = "SELECT p FROM ProcessLog p"),
-    @NamedQuery(name = "ProcessLog.findByLogId", query = "SELECT p FROM ProcessLog p WHERE p.logId = :logId"),
-    @NamedQuery(name = "ProcessLog.findByLogTimestamp", query = "SELECT p FROM ProcessLog p WHERE p.logTimestamp = :logTimestamp"),
-    @NamedQuery(name = "ProcessLog.findByBatchIdentifier", query = "SELECT p FROM ProcessLog p WHERE p.batchIdentifier = :batchIdentifier"),
-    @NamedQuery(name = "ProcessLog.findByMachineName", query = "SELECT p FROM ProcessLog p WHERE p.machineName = :machineName"),
-    @NamedQuery(name = "ProcessLog.findByStartTime", query = "SELECT p FROM ProcessLog p WHERE p.startTime = :startTime"),
-    @NamedQuery(name = "ProcessLog.findByEndTime", query = "SELECT p FROM ProcessLog p WHERE p.endTime = :endTime"),
-    @NamedQuery(name = "ProcessLog.findByNumberOfDocuments", query = "SELECT p FROM ProcessLog p WHERE p.numberOfDocuments = :numberOfDocuments"),
-    @NamedQuery(name = "ProcessLog.findByUploadedToOmniDocs", query = "SELECT p FROM ProcessLog p WHERE p.uploadedToOmniDocs = :uploadedToOmniDocs"),
-    @NamedQuery(name = "ProcessLog.findByUploadedToOmniDocsTime", query = "SELECT p FROM ProcessLog p WHERE p.uploadedToOmniDocsTime = :uploadedToOmniDocsTime"),
-    @NamedQuery(name = "ProcessLog.findByUploadedToDocuWare", query = "SELECT p FROM ProcessLog p WHERE p.uploadedToDocuWare = :uploadedToDocuWare"),
-    @NamedQuery(name = "ProcessLog.findByUploadedToDocuWareTime", query = "SELECT p FROM ProcessLog p WHERE p.uploadedToDocuWareTime = :uploadedToDocuWareTime")})
+/*@NamedQueries({ @NamedQuery(name = "ProcessLog.findAll", query = "SELECT p FROM ProcessLog p"),
+		@NamedQuery(name = "ProcessLog.findByLogId", query = "SELECT p FROM ProcessLog p WHERE p.logId = :logId")
+		@NamedQuery(name = "ProcessLog.findByLogTimestamp", query = "SELECT p FROM ProcessLog p WHERE p.LogTimestamp = :LogTimestamp"),
+		@NamedQuery(name = "ProcessLog.findByBatchId", query = "SELECT p FROM ProcessLog p WHERE p.BatchId = :BatchId"),
+		@NamedQuery(name = "ProcessLog.findByBatchIdentifier", query = "SELECT p FROM ProcessLog p WHERE p.BatchIdentifier = :BatchIdentifier"),
+		@NamedQuery(name = "ProcessLog.findByUploadedToOmniDocs", query = "SELECT p FROM ProcessLog p WHERE p.uploadedToOmniDocs = :uploadedToOmniDocs"),
+		@NamedQuery(name = "ProcessLog.findByUploadedToDocuWare", query = "SELECT p FROM ProcessLog p WHERE p.uploadedToDocuWare = :uploadedToDocuWare"),
+		@NamedQuery(name = "ProcessLog.findByStatus", query = "SELECT p FROM ProcessLog p WHERE p.Status = :Status"),
+		@NamedQuery(name = "ProcessLog.findByComments", query = "SELECT p FROM ProcessLog p WHERE p.Comments = :Comments")
+
+})*/
+
 public class ProcessLog implements Serializable {
-    private static final long serialVersionUID = 1L;
-    @Id
-    @Basic(optional = false)
-    @Column(name = "LogId")
-    private Long logId;
-    @Basic(optional = false)
-    @Column(name = "LogTimestamp")
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date logTimestamp;
-    @Basic(optional = false)
-    @Column(name = "BatchIdentifier")
-    private String batchIdentifier;
-    @Basic(optional = false)
-    @Column(name = "MachineName")
-    private String machineName;
-    @Basic(optional = false)
-    @Column(name = "StartTime")
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date startTime;
-    @Basic(optional = false)
-    @Column(name = "EndTime")
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date endTime;
-    @Basic(optional = false)
-    @Column(name = "NumberOfDocuments")
-    private int numberOfDocuments;
-    @Basic(optional = false)
-    @Column(name = "UploadedToOmniDocs")
-    private boolean uploadedToOmniDocs;
-    @Column(name = "UploadedToOmniDocsTime")
-    private Integer uploadedToOmniDocsTime;
-    @Basic(optional = false)
-    @Column(name = "UploadedToDocuWare")
-    private int uploadedToDocuWare;
-    @Column(name = "UploadedToDocuWareTime")
-    private Integer uploadedToDocuWareTime;
-    @OneToMany(mappedBy = "logId")
-    private Collection<ProcessLogDetails> processLogDetailsCollection;
-    @OneToOne(cascade = CascadeType.ALL, mappedBy = "processLog1")
-    private ProcessLog processLog;
-    @JoinColumn(name = "LogId", referencedColumnName = "LogId", insertable = false, updatable = false)
-    @OneToOne(optional = false)
-    private ProcessLog processLog1;
+	private static final long serialVersionUID = 1L;
+	@Id
+	@GeneratedValue(strategy=GenerationType.IDENTITY)
+	@Column(name = "LogId")
+	private Long logId;
+	@Basic(optional = false)
+	@Column(name = "LogTimestamp")
+	@Temporal(TemporalType.TIMESTAMP)
+	private Date logTimestamp;
+	@Basic(optional = false)
+	@Column(name = "BatchId")
+	private String batchID;
+	@Basic(optional = false)
+	@Column(name = "BatchIdentifier")
+	private String batchIdentifier;
+	@Basic(optional = false)
+	@Column(name = "UploadedToOmniDocs")
+	private boolean uploadedToOmniDocs;
+	@Basic(optional = false)
+	@Column(name = "UploadedToDocuWare")
+	private boolean uploadedToDocuWare;
+	@Basic(optional = false)
+	@Column(name = "Status")
+	private boolean status;
+	@Basic(optional = true)
+	@Column(name = "Comments")
+	private String comments;
+	
+	public ProcessLog() {
+		super();
+	}
 
-    public ProcessLog() {
-    }
 
-    public ProcessLog(Long logId) {
-        this.logId = logId;
-    }
 
-    public ProcessLog(Long logId, Date logTimestamp, String batchIdentifier, String machineName, Date startTime, Date endTime, int numberOfDocuments, boolean uploadedToOmniDocs, int uploadedToDocuWare) {
-        this.logId = logId;
-        this.logTimestamp = logTimestamp;
-        this.batchIdentifier = batchIdentifier;
-        this.machineName = machineName;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.numberOfDocuments = numberOfDocuments;
-        this.uploadedToOmniDocs = uploadedToOmniDocs;
-        this.uploadedToDocuWare = uploadedToDocuWare;
-    }
+	public ProcessLog(Date logTimestamp, String batchID, String batchIdentifier, boolean uploadedToOmniDocs, boolean uploadedToDocuWare, boolean success, String commment) {
+		this.logTimestamp = logTimestamp;
+		this.batchID = batchID;
+		this.batchIdentifier = batchIdentifier;
+		this.uploadedToOmniDocs = uploadedToOmniDocs;
+		this.uploadedToDocuWare = uploadedToDocuWare;
+		this.comments=commment;
+		this.status=success;
+	}
 
-    public Long getLogId() {
-        return logId;
-    }
 
-    public void setLogId(Long logId) {
-        this.logId = logId;
-    }
+	public String getBatchID() {
+		return batchID;
+	}
 
-    public Date getLogTimestamp() {
-        return logTimestamp;
-    }
+	public void setBatchID(String batchID) {
+		this.batchID = batchID;
+	}
 
-    public void setLogTimestamp(Date logTimestamp) {
-        this.logTimestamp = logTimestamp;
-    }
+	public Long getLogId() {
+		return logId;
+	}
 
-    public String getBatchIdentifier() {
-        return batchIdentifier;
-    }
+	public void setLogId(Long logId) {
+		this.logId = logId;
+	}
 
-    public void setBatchIdentifier(String batchIdentifier) {
-        this.batchIdentifier = batchIdentifier;
-    }
+	public Date getLogTimestamp() {
+		return logTimestamp;
+	}
 
-    public String getMachineName() {
-        return machineName;
-    }
+	public void setLogTimestamp(Date logTimestamp) {
+		this.logTimestamp = logTimestamp;
+	}
 
-    public void setMachineName(String machineName) {
-        this.machineName = machineName;
-    }
+	public String getBatchIdentifier() {
+		return batchIdentifier;
+	}
 
-    public Date getStartTime() {
-        return startTime;
-    }
+	public void setBatchIdentifier(String batchIdentifier) {
+		this.batchIdentifier = batchIdentifier;
+	}
 
-    public void setStartTime(Date startTime) {
-        this.startTime = startTime;
-    }
+	public boolean isUploadedToOmniDocs() {
+		return uploadedToOmniDocs;
+	}
 
-    public Date getEndTime() {
-        return endTime;
-    }
+	public void setUploadedToOmniDocs(boolean uploadedToOmniDocs) {
+		this.uploadedToOmniDocs = uploadedToOmniDocs;
+	}
 
-    public void setEndTime(Date endTime) {
-        this.endTime = endTime;
-    }
+	public boolean getUploadedToDocuWare() {
+		return uploadedToDocuWare;
+	}
 
-    public int getNumberOfDocuments() {
-        return numberOfDocuments;
-    }
+	public void setUploadedToDocuWare(boolean uploadedToDocuWare) {
+		this.uploadedToDocuWare = uploadedToDocuWare;
+	}
 
-    public void setNumberOfDocuments(int numberOfDocuments) {
-        this.numberOfDocuments = numberOfDocuments;
-    }
+	public static long getSerialversionuid() {
+		return serialVersionUID;
+	}
 
-    public boolean getUploadedToOmniDocs() {
-        return uploadedToOmniDocs;
-    }
+	@Override
+	public int hashCode() {
+		int hash = 0;
+		hash += (logId != null ? logId.hashCode() : 0);
+		return hash;
+	}
 
-    public void setUploadedToOmniDocs(boolean uploadedToOmniDocs) {
-        this.uploadedToOmniDocs = uploadedToOmniDocs;
-    }
+	@Override
+	public boolean equals(Object object) {
+		// TODO: Warning - this method won't work in the case the id fields are not set
+		if (!(object instanceof ProcessLog)) {
+			return false;
+		}
+		ProcessLog other = (ProcessLog) object;
+		if ((this.logId == null && other.logId != null) || (this.logId != null && !this.logId.equals(other.logId))) {
+			return false;
+		}
+		return true;
+	}
 
-    public Integer getUploadedToOmniDocsTime() {
-        return uploadedToOmniDocsTime;
-    }
+	@Override
+	public String toString() {
+		return "ProcessLog[ logId=" + logId + " ]";
+	}
 
-    public void setUploadedToOmniDocsTime(Integer uploadedToOmniDocsTime) {
-        this.uploadedToOmniDocsTime = uploadedToOmniDocsTime;
-    }
-
-    public int getUploadedToDocuWare() {
-        return uploadedToDocuWare;
-    }
-
-    public void setUploadedToDocuWare(int uploadedToDocuWare) {
-        this.uploadedToDocuWare = uploadedToDocuWare;
-    }
-
-    public Integer getUploadedToDocuWareTime() {
-        return uploadedToDocuWareTime;
-    }
-
-    public void setUploadedToDocuWareTime(Integer uploadedToDocuWareTime) {
-        this.uploadedToDocuWareTime = uploadedToDocuWareTime;
-    }
-
-    public Collection<ProcessLogDetails> getProcessLogDetailsCollection() {
-        return processLogDetailsCollection;
-    }
-
-    public void setProcessLogDetailsCollection(Collection<ProcessLogDetails> processLogDetailsCollection) {
-        this.processLogDetailsCollection = processLogDetailsCollection;
-    }
-
-    public ProcessLog getProcessLog() {
-        return processLog;
-    }
-
-    public void setProcessLog(ProcessLog processLog) {
-        this.processLog = processLog;
-    }
-
-    public ProcessLog getProcessLog1() {
-        return processLog1;
-    }
-
-    public void setProcessLog1(ProcessLog processLog1) {
-        this.processLog1 = processLog1;
-    }
-
-    @Override
-    public int hashCode() {
-        int hash = 0;
-        hash += (logId != null ? logId.hashCode() : 0);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object object) {
-        // TODO: Warning - this method won't work in the case the id fields are not set
-        if (!(object instanceof ProcessLog)) {
-            return false;
-        }
-        ProcessLog other = (ProcessLog) object;
-        if ((this.logId == null && other.logId != null) || (this.logId != null && !this.logId.equals(other.logId))) {
-            return false;
-        }
-        return true;
-    }
-
-    @Override
-    public String toString() {
-        return "ProcessLog[ logId=" + logId + " ]";
-    }
-    
 }
