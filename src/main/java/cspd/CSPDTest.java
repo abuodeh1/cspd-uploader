@@ -55,9 +55,9 @@ public class CSPDTest {
 
 				cspdEM.getTransaction().begin();
 
-				while (!(batchID = reader.nextLine()).equals("bye")) {
+				while (!(batchID = reader.nextLine()).equalsIgnoreCase("bye")) {
 
-					/**
+					/*
 					 * Fetch all Batch records by id
 					 */
 
@@ -73,7 +73,7 @@ public class CSPDTest {
 					batchDetailsTypeQuery.setParameter("id", Integer.valueOf(batchID));
 					List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
 
-					/**
+					/***
 					 * Fetch folder meta data by serialNumber and part for each batchDetials record
 					 */
 					Folder folder = null;
@@ -81,7 +81,7 @@ public class CSPDTest {
 					while (batchDetailsIterator.hasNext()) {
 						BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
 
-						/* Prepare omnidocs folder */
+						/*** Prepare omnidocs folder ***/
 						try {
 							folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
 						} catch (Exception e) {
@@ -206,7 +206,7 @@ public class CSPDTest {
 	private static void closeResourcesAndExit() {
 
 		omniService.complete();
-		cspdEM.getTransaction().commit();
+		//cspdEM.getTransaction().commit();
 		cspdEM.close();
 
 		System.exit(0);
