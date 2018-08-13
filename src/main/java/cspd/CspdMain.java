@@ -112,6 +112,29 @@ public class CspdMain {
 				continue;
 			}
 
+			/* checking opex folder contents */
+			File[] files = opexFolder.listFiles(new FileFilter() {
+
+				@Override
+				public boolean accept(File file) {
+
+					if (file.isDirectory())
+
+						return false;
+
+					if (!file.getName().toLowerCase().endsWith(".pdf"))
+						return false;
+
+					return true;
+				}
+			});
+
+			if (files.length == 0) {
+				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "The opex folder is empty"));
+				continue;
+			}
+
+			/*delete the omnidocs folder if exists*/
 			if (props.getProperty("omnidocs.deleteFolderIfExist").equalsIgnoreCase("true")) {
 				try {
 					List<Folder> omniFolder = omniService.getFolderUtility().findFolderByName(props.getProperty("opex.type." + batch.getFileType()), folderName);
@@ -133,24 +156,8 @@ public class CspdMain {
 				continue;
 			}
 
-			/* upload documents */
-			File[] files = opexFolder.listFiles(new FileFilter() {
-
-				@Override
-				public boolean accept(File file) {
-
-					if (file.isDirectory())
-
-						return false;
-
-					if (!file.getName().toLowerCase().endsWith(".pdf"))
-						return false;
-
-					return true;
-				}
-			});
-
-			/* move Opex Folder */
+			
+			/* create opex folder in transfer destination and backing up if there is a one */
 			String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + opexFolder.getName();
 			File transferFolder = new File(transferFolderDest);
 
@@ -164,11 +171,7 @@ public class CspdMain {
 
 			transferFolder.mkdir();
 
-			if (files.length == 0) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "The opex folder is empty"));
-				continue;
-			}
-
+			/*upload the opex folder contents to omnidocs*/
 			for (int i = 0; i < files.length; i++) {
 
 				try {
