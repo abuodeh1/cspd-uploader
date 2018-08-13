@@ -97,7 +97,7 @@ public class CspdMain {
 			try {
 				folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
 			} catch (Exception e) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, batchDetailsRecord.getSerialNumber() + "%" + batchDetailsRecord.getPart(), false, false, false, e.getMessage()));
+				cspdEM.persist(new ProcessLog(new Date(), batchID, folder.getFolderName(), false, false, false, e.getMessage()));
 				continue;
 			}
 
