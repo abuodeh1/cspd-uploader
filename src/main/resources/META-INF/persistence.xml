@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence version="2.1" 
+			 xmlns="http://xmlns.jcp.org/xml/ns/persistence" 
+			 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+			 xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence http://xmlns.jcp.org/xml/ns/persistence/persistence_2_1.xsd">
+ 
+ 
+ 	<!-- <persistence-unit name="cspd" transaction-type="RESOURCE_LOCAL" /> -->
+ 	<!-- <persistence-unit name="omnidocs" transaction-type="RESOURCE_LOCAL" /> -->
+	
+	<persistence-unit name="cspd" transaction-type="RESOURCE_LOCAL">
+<!-- 	    <properties>
+	      <property name="javax.persistence.jdbc.driver" value="net.sourceforge.jtds.jdbc.Driver" />
+	      <property name="javax.persistence.jdbc.url"    value="jdbc:jtds:sqlserver://192.168.60.158:1433;DatabaseName=cspd" />
+	      <property name="javax.persistence.jdbc.user" value="sa" />
+	      <property name="javax.persistence.jdbc.password" value="P@ssw0rd" />
+	      <property name="hibernate.dialect" value="org.hibernate.dialect.SQLServerDialect"/>
+	      <property name="hibernate.connection.autocommit" value="true" />
+	      <property name="show_sql" value="true"/>
+	      <property name="hibernate.temp.use_jdbc_metadata_defaults" value="false"/>
+	    </properties> -->
+	  </persistence-unit>
+	  
+	  <persistence-unit name="omnidocs" transaction-type="RESOURCE_LOCAL">
+<!-- 	    <properties>
+	      <property name="javax.persistence.jdbc.driver" value="oracle.jdbc.driver.OracleDriver" />
+	      <property name="javax.persistence.jdbc.url"    value="jdbc:oracle:thin:@192.168.60.93:1521:etech11g" />
+	      <property name="javax.persistence.jdbc.user" value="jlgccab1" />
+	      <property name="javax.persistence.jdbc.password" value="jlgccab1" />
+	      <property name="hibernate.dialect" value="org.hibernate.dialect.OracleDialect"/>
+	      <property name="hibernate.connection.autocommit" value="true" />
+	      <property name="show_sql" value="true"/>
+	      <property name="hibernate.temp.use_jdbc_metadata_defaults" value="false"/>
+	    </properties> -->
+	  </persistence-unit>
+  
+</persistence>
