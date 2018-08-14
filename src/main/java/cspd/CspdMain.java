@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -17,6 +19,7 @@ import javax.persistence.Query;
 import javax.persistence.TypedQuery;
 
 import cspd.core.CspdMetadata;
+import cspd.core.ModifiedFolder;
 import cspd.entities.BatchDetails;
 import cspd.entities.Batches;
 import cspd.entities.ProcessLog;
@@ -25,11 +28,14 @@ import etech.dms.exception.DocumentException;
 import etech.dms.exception.FolderException;
 import etech.omni.OmniService;
 import etech.omni.core.DataDefinition;
+import etech.omni.core.Document;
 import etech.omni.core.Folder;
+import etech.omni.utils.OmniDocumentUtility;
 
 public class CspdMain {
 
 	private static EntityManager cspdEM = null;
+	private static EntityManager omniEM = null;
 	private static Properties props;
 	private static OmniService omniService = null;
 
@@ -39,8 +45,13 @@ public class CspdMain {
 
 			if (args[0].equalsIgnoreCase("sync")) {
 
-				System.out.println("SYNC COMMAND");
-				
+				try {
+					sync(args[1], args[2]);
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
 			} else {
 				try {
 
@@ -134,7 +145,7 @@ public class CspdMain {
 				continue;
 			}
 
-			/*delete the omnidocs folder if exists*/
+			/* delete the omnidocs folder if exists */
 			if (props.getProperty("omnidocs.deleteFolderIfExist").equalsIgnoreCase("true")) {
 				try {
 					List<Folder> omniFolder = omniService.getFolderUtility().findFolderByName(props.getProperty("opex.type." + batch.getFileType()), folderName);
@@ -156,22 +167,27 @@ public class CspdMain {
 				continue;
 			}
 
-			
-			/* create opex folder in transfer destination and backing up if there is a one */
+			/*
+			 * create opex folder in transfer destination and backing up if there is a one
+			 */
+
 			String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + opexFolder.getName();
 			File transferFolder = new File(transferFolderDest);
 
-			if (transferFolder.exists()) {
+			moveToBackupFolder(transferFolder);
 
-				SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
-				String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
+			// if (transferFolder.exists()) {
+			//
+			// SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
+			// String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
+			//
+			// boolean rename = transferFolder.renameTo(new File((transferFolder + " - " +
+			// currentDateTime)));
+			// }
+			//
+			// transferFolder.mkdir();
 
-				boolean rename = transferFolder.renameTo(new File((transferFolder + " - " + currentDateTime)));
-			}
-
-			transferFolder.mkdir();
-
-			/*upload the opex folder contents to omnidocs*/
+			/* upload the opex folder contents to omnidocs */
 			for (int i = 0; i < files.length; i++) {
 
 				try {
@@ -204,20 +220,20 @@ public class CspdMain {
 
 	}
 
-	private static void getchangefolder(String batchID) {
-		
-		
-		prepareResources();
-		
-		cspdEM.getTransaction().begin();
-		
-		
-		
-		
-		
+	private static void moveToBackupFolder(File transferFolder) {
+
+		if (transferFolder.exists()) {
+
+			SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
+			String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
+
+			 transferFolder.renameTo(new File((transferFolder + " - " + currentDateTime)));
+		}
+
+		transferFolder.mkdir();
+
 	}
-	
-	
+
 	private static void uploadCleanup(String transferFolderDest, File opexFolder) {
 
 		File[] files = opexFolder.listFiles();
@@ -256,7 +272,7 @@ public class CspdMain {
 
 			cspdEM = EntityManagerUtil.getCSPDEntityManager(props);
 
-			EntityManagerUtil.getOmnidocsEntityManager(props);
+			omniEM = EntityManagerUtil.getOmnidocsEntityManager(props);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -298,7 +314,7 @@ public class CspdMain {
 		case 1:
 
 			folder.setFolderName(serialNumber.concat("%" + part));
-			
+
 			String dataDefinitionName = props.getProperty("omnidocs.dcPassport");
 
 			dataDefinition = omniService.getDataDefinitionUtility().findDataDefinitionByName(dataDefinitionName);
@@ -419,7 +435,60 @@ public class CspdMain {
 		return metadata.get(0);
 	}
 
-	public void checkdest() {
+	private static void sync(String startDate, String endDate) throws Exception {
+
+		prepareResources();
+		// Date startDate,Date endDate
+		// && opex folder ID
+
+		String changedFolders = "SELECT DISTINCT SUBSDIARYOBJECTNAME AS folderName , " + "	SUBSDIARYOBJECTID AS folderIndex " + "FROM PDBNEWAUDITTRAIL_TABLE A , "
+				+ "	PDBFOLDER F " + "WHERE USERINDEX IN (SELECT USERINDEX " + "					FROM PDBGROUPMEMBER " + "					WHERE GROUPINDEX = (SELECT GROUPINDEX "
+				+ "										FROM PDBGROUP " + "										WHERE GROUPNAME LIKE 'Quality%')) "
+				+ "	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD') " + "	AND TO_DATE(:endDate, 'YYYY-MM-DD') " + "	AND DATETIME > (SELECT MAX(CREATEDDATETIME) "
+				+ "					FROM PDBFOLDER " + "					WHERE FOLDERINDEX = SUBSDIARYOBJECTID) " + "	AND SUBSDIARYOBJECTID IN (	SELECT FOLDERINDEX "
+				+ "								FROM PDBFOLDER P " + "								WHERE P.PARENTFOLDERINDEX IN :indexes "
+				+ "									AND A.COMMNT NOT LIKE '%Trash%' " + "									AND ACTIONID NOT IN (204) ) " + "UNION "
+				+ "SELECT DISTINCT F.NAME AS folderName, " + "	ACTIVEOBJECTID AS folderIndex " + "FROM PDBNEWAUDITTRAIL_TABLE A , " + "	PDBFOLDER F "
+				+ "WHERE USERINDEX IN (SELECT USERINDEX " + "					FROM PDBGROUPMEMBER " + "					WHERE GROUPINDEX = (SELECT GROUPINDEX "
+				+ "										FROM PDBGROUP " + "										WHERE GROUPNAME LIKE 'Quality%' )) "
+				+ "	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD' ) " + "	AND TO_DATE(:endDate, 'YYYY-MM-DD') " + "	AND DATETIME > (SELECT MAX( CREATEDDATETIME) "
+				+ "					FROM PDBFOLDER " + "					WHERE FOLDERINDEX = ACTIVEOBJECTID) " + "	AND SUBSDIARYOBJECTID = -1 "
+				+ "	AND F.FOLDERINDEX = ACTIVEOBJECTID " + "	AND CATEGORY = 'F' " + "	AND ACTIVEOBJECTID IN (	SELECT FOLDERINDEX "
+				+ "							FROM PDBFOLDER P " + "							WHERE P.PARENTFOLDERINDEX IN :indexes "
+				+ "								AND A.COMMNT NOT LIKE '%Trash%' " + "								AND ACTIONID NOT IN (204))";
+
+		List<Integer> indexes = Arrays.asList(Integer.valueOf(props.getProperty("opex.type.1")), Integer.valueOf(props.getProperty("opex.type.2")),
+				Integer.valueOf(props.getProperty("opex.type.3")), Integer.valueOf(props.getProperty("opex.type.4")), Integer.valueOf(props.getProperty("opex.type.5")));
+
+		Query changeFolderQ = omniEM.createNativeQuery(changedFolders, "ChangedFoldersMapping");
+		changeFolderQ.setParameter("startDate", startDate);
+		changeFolderQ.setParameter("endDate", endDate);
+		changeFolderQ.setParameter("indexes", indexes);
+
+		List<ModifiedFolder> modifiedFolders = changeFolderQ.getResultList();
+
+		for (int i = 0; i < modifiedFolders.size(); i++) {
+
+			String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + modifiedFolders.get(i).getFolderName();
+			File transferFolder = new File(transferFolderDest);
+
+			moveToBackupFolder(transferFolder);
+
+			OmniDocumentUtility omniDocumentUtility = omniService.getDocumentUtility();
+
+			List<Document> docList = omniDocumentUtility.getDocumentList(modifiedFolders.get(i).getFolderIndex(), false);
+			for (int j = 0; j < docList.size(); j++) {
+				String documentDest = transferFolderDest + System.getProperty("file.separator") + docList.get(j).getDocumentName() + "." + docList.get(j).getCreatedByAppName();
+
+				omniDocumentUtility.exportByIndex(documentDest, docList.get(j).getDocumentIndex());
+			}
+
+			
+		}
+		
+		// modifiedFolders.forEach(System.out::println);
+
+		closeResourcesAndExit();
 
 	}
 

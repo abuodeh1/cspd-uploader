@@ -12,20 +12,32 @@ import java.util.Date;
 import javax.persistence.Basic;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
+import javax.persistence.ColumnResult;
+import javax.persistence.ConstructorResult;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Lob;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.OneToMany;
+import javax.persistence.SqlResultSetMapping;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+
+import cspd.core.ModifiedFolder;
 
 /**
  *
  * @author mabuodeh
  */
+
+@SqlResultSetMapping(
+        name = "ChangedFoldersMapping",
+        classes = @ConstructorResult(
+                targetClass = ModifiedFolder.class,
+                columns = { @ColumnResult(name = "folderIndex", type=String.class), @ColumnResult(name = "folderName", type=String.class)}))
+
 @Entity
 @Table(name = "Batches")
 @NamedQueries({

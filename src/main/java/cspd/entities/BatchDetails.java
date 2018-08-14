@@ -46,7 +46,6 @@ import cspd.core.CspdMetadata;
                     @ColumnResult(name = "FileNumber"),
                     @ColumnResult(name = "FolderClassCode"),
                     @ColumnResult(name = "FolderClassText")}))
-
 @Entity
 @Table(name = "BatchDetails")
 @NamedQueries({
