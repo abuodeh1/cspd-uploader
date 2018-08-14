@@ -48,8 +48,7 @@ public class CspdMain {
 				try {
 					sync(args[1], args[2]);
 				} catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					System.exit(0);
 				}
 
 			} else {
