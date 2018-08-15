@@ -38,7 +38,7 @@ import javax.persistence.TemporalType;
 		@NamedQuery(name = "ProcessLog.findByComments", query = "SELECT p FROM ProcessLog p WHERE p.Comments = :Comments")
 
 })*/
-
+@NamedQueries({ @NamedQuery(name = "ProcessLog.findLastBI", query = "SELECT p FROM ProcessLog p WHERE logId = (SELECT pl.logId FROM ProcessLog pl WHERE pl.logTimestamp = (SELECT MAX(plg.logTimestamp) FROM ProcessLog plg WHERE plg.batchIdentifier = :serialNumber))")})
 public class ProcessLog implements Serializable {
 	private static final long serialVersionUID = 1L;
 	@Id
@@ -57,10 +57,10 @@ public class ProcessLog implements Serializable {
 	private String batchIdentifier;
 	@Basic(optional = false)
 	@Column(name = "UploadedToOmniDocs")
-	private boolean uploadedToOmniDocs;
+	private int uploadedToOmniDocs;
 	@Basic(optional = false)
 	@Column(name = "UploadedToDocuWare")
-	private boolean uploadedToDocuWare;
+	private int uploadedToDocuWare;
 	@Basic(optional = false)
 	@Column(name = "Status")
 	private boolean status;
@@ -74,7 +74,7 @@ public class ProcessLog implements Serializable {
 
 
 
-	public ProcessLog(Date logTimestamp, String batchID, String batchIdentifier, boolean uploadedToOmniDocs, boolean uploadedToDocuWare, boolean success, String commment) {
+	public ProcessLog(Date logTimestamp, String batchID, String batchIdentifier, int uploadedToOmniDocs, int uploadedToDocuWare, boolean success, String commment) {
 		this.logTimestamp = logTimestamp;
 		this.batchID = batchID;
 		this.batchIdentifier = batchIdentifier;
@@ -117,19 +117,19 @@ public class ProcessLog implements Serializable {
 		this.batchIdentifier = batchIdentifier;
 	}
 
-	public boolean isUploadedToOmniDocs() {
+	public int isUploadedToOmniDocs() {
 		return uploadedToOmniDocs;
 	}
 
-	public void setUploadedToOmniDocs(boolean uploadedToOmniDocs) {
+	public void setUploadedToOmniDocs(int uploadedToOmniDocs) {
 		this.uploadedToOmniDocs = uploadedToOmniDocs;
 	}
 
-	public boolean getUploadedToDocuWare() {
+	public int getUploadedToDocuWare() {
 		return uploadedToDocuWare;
 	}
 
-	public void setUploadedToDocuWare(boolean uploadedToDocuWare) {
+	public void setUploadedToDocuWare(int uploadedToDocuWare) {
 		this.uploadedToDocuWare = uploadedToDocuWare;
 	}
 

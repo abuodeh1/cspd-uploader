@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
@@ -48,8 +47,8 @@ public class CspdMain {
 				try {
 					sync(args[1], args[2]);
 				} catch (Exception e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
+					System.exit(0);
 				}
 
 			} else {
@@ -108,7 +107,9 @@ public class CspdMain {
 			try {
 				folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
 			} catch (Exception e) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, folder.getFolderName(), false, false, false, e.getMessage()));
+				folder = new Folder();
+				folder.setFolderName((batch.getFileType() == 1? batchDetailsRecord.getSerialNumber() + "%" + batchDetailsRecord.getPart(): batchDetailsRecord.getSerialNumber()));
+				cspdEM.persist(new ProcessLog(new Date(), batchID, folder.getFolderName(), 0, 0, false, e.getMessage()));
 				continue;
 			}
 
@@ -119,7 +120,7 @@ public class CspdMain {
 			File opexFolder = new File(scannerdist + System.getProperty("file.separator") + folderName);
 
 			if (!opexFolder.exists()) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Opex folder doesn't exist"));
+				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Opex folder doesn't exist"));
 				continue;
 			}
 
@@ -141,7 +142,7 @@ public class CspdMain {
 			});
 
 			if (files.length == 0) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "The opex folder is empty"));
+				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "The opex folder is empty"));
 				continue;
 			}
 
@@ -153,7 +154,7 @@ public class CspdMain {
 						omniService.getFolderUtility().delete(omniFolder.get(0).getFolderIndex());
 					}
 				} catch (FolderException e) {
-					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to find or delete the exist of omnidocs folder"));
+					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to find or delete the exist of omnidocs folder"));
 					continue;
 				}
 			}
@@ -163,7 +164,7 @@ public class CspdMain {
 			try {
 				addedFolder = omniService.getFolderUtility().addFolder(folder.getParentFolderIndex(), folder);
 			} catch (FolderException e) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to create the omnidocs folder"));
+				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to create the omnidocs folder"));
 				continue;
 			}
 
@@ -197,14 +198,14 @@ public class CspdMain {
 							StandardCopyOption.REPLACE_EXISTING);
 
 				} catch (DocumentException e) {
-					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to upload the opex folder's document"));
+					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to upload the opex folder's document"));
 					continue;
 				} catch (IOException e) {
-					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), false, false, false, "Unable to upload the opex folder's document"));
+					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to upload the opex folder's document"));
 					continue;
 				}
 
-				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), true, false, true, null));
+				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 1, 0, true, null));
 
 				uploadCleanup(transferFolderDest, opexFolder);
 			}
@@ -438,8 +439,6 @@ public class CspdMain {
 	private static void sync(String startDate, String endDate) throws Exception {
 
 		prepareResources();
-		// Date startDate,Date endDate
-		// && opex folder ID
 
 		String changedFolders = "SELECT DISTINCT SUBSDIARYOBJECTNAME AS folderName , " + "	SUBSDIARYOBJECTID AS folderIndex " + "FROM PDBNEWAUDITTRAIL_TABLE A , "
 				+ "	PDBFOLDER F " + "WHERE USERINDEX IN (SELECT USERINDEX " + "					FROM PDBGROUPMEMBER " + "					WHERE GROUPINDEX = (SELECT GROUPINDEX "
@@ -467,6 +466,7 @@ public class CspdMain {
 
 		List<ModifiedFolder> modifiedFolders = changeFolderQ.getResultList();
 
+		cspdEM.getTransaction().begin();
 		for (int i = 0; i < modifiedFolders.size(); i++) {
 
 			String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + modifiedFolders.get(i).getFolderName();
@@ -483,10 +483,17 @@ public class CspdMain {
 				omniDocumentUtility.exportByIndex(documentDest, docList.get(j).getDocumentIndex());
 			}
 
+			TypedQuery<ProcessLog> typedProcessLog = cspdEM.createNamedQuery("ProcessLog.findLastBI", ProcessLog.class);
+			typedProcessLog.setParameter("serialNumber", modifiedFolders.get(i).getFolderName());
+			try {
+				ProcessLog processLog = typedProcessLog.getSingleResult();
+				processLog.setUploadedToDocuWare(2);
+				cspdEM.persist(processLog);
+			}catch(Exception e) {}
 			
 		}
 		
-		// modifiedFolders.forEach(System.out::println);
+		cspdEM.getTransaction().commit();
 
 		closeResourcesAndExit();
 
