@@ -30,5 +30,10 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/hmubaslat/Desktop/New folder (2)/commons-digester-2.1.jar"/>
+	<classpathentry kind="lib" path="C:/Users/hmubaslat/Desktop/New folder (2)/jasperreports-6.5.1.jar"/>
+	<classpathentry kind="lib" path="C:/Users/hmubaslat/Desktop/New folder (2)/org.apache.commons.logging_1.1.1.v201101211721.jar"/>
+	<classpathentry kind="lib" path="C:/Users/hmubaslat/Desktop/New folder (2)/org.apache.commons.collections_3.2.2.v201511171945.jar"/>
+	<classpathentry kind="lib" path="C:/Users/hmubaslat/Desktop/New folder (2)/commons-beanutils-1.9.3.jar"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>

@@ -6,13 +6,17 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import java.util.Scanner;
 
 import javax.persistence.EntityManager;
 import javax.persistence.Query;
@@ -31,6 +35,14 @@ import etech.omni.core.DataDefinition;
 import etech.omni.core.Document;
 import etech.omni.core.Folder;
 import etech.omni.utils.OmniDocumentUtility;
+import net.sf.jasperreports.engine.JRException;
+import net.sf.jasperreports.engine.JasperCompileManager;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.JasperReport;
+import net.sf.jasperreports.engine.design.JasperDesign;
+import net.sf.jasperreports.engine.xml.JRXmlLoader;
+import net.sf.jasperreports.view.JasperViewer;
 
 public class CspdMain {
 
@@ -38,33 +50,35 @@ public class CspdMain {
 	private static EntityManager omniEM = null;
 	private static Properties props;
 	private static OmniService omniService = null;
-
+	static List<ModifiedFolder> modifiedFolders =null;
 	public static void main(String[] args) {
 
-		if ((args.length != 0)) {
+			report();
 
-			if (args[0].equalsIgnoreCase("sync")) {
-
-				try {
-					sync(args[1], args[2]);
-				} catch (Exception e) {
-					System.exit(0);
-				}
-
-			} else {
-				try {
-
-					String batchID = args[0];
-
-					Integer.valueOf(batchID);
-
-					uploadByBatchId(batchID);
-
-				} catch (NumberFormatException nfe) {
-					System.exit(0);
-				}
-			}
-		}
+		// if ((args.length != 0)) {
+		//
+		// if (args[0].equalsIgnoreCase("sync")) {
+		//
+		// try {
+		// sync(args[1], args[2]);
+		// } catch (Exception e) {
+		// System.exit(0);
+		// }
+		//
+		// } else {
+		// try {
+		//
+		// String batchID = args[0];
+		//
+		// Integer.valueOf(batchID);
+		//
+		// uploadByBatchId(batchID);
+		//
+		// } catch (NumberFormatException nfe) {
+		// System.exit(0);
+		// }
+		// }
+		// }
 	}
 
 	private static void uploadByBatchId(String batchID) {
@@ -226,7 +240,7 @@ public class CspdMain {
 			SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
 			String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
 
-			 transferFolder.renameTo(new File((transferFolder + " - " + currentDateTime)));
+			transferFolder.renameTo(new File((transferFolder + " - " + currentDateTime)));
 		}
 
 		transferFolder.mkdir();
@@ -464,7 +478,7 @@ public class CspdMain {
 		changeFolderQ.setParameter("endDate", endDate);
 		changeFolderQ.setParameter("indexes", indexes);
 
-		List<ModifiedFolder> modifiedFolders = changeFolderQ.getResultList();
+		 modifiedFolders = changeFolderQ.getResultList();
 
 		for (int i = 0; i < modifiedFolders.size(); i++) {
 
@@ -482,12 +496,49 @@ public class CspdMain {
 				omniDocumentUtility.exportByIndex(documentDest, docList.get(j).getDocumentIndex());
 			}
 
-			
 		}
-		
+
 		// modifiedFolders.forEach(System.out::println);
 
 		closeResourcesAndExit();
+
+	}
+
+	private static void report() {
+
+		try {
+			Class.forName("oracle.jdbc.driver.OracleDriver");
+
+			Connection conn = DriverManager.getConnection("jdbc:oracle:thin:@192.168.60.93:1521:etech11g", "jlgccab1", "jlgccab1");
+			String path = "sync.jrxml";
+
+			//
+			// JasperReport jr = JasperCompileManager.compileReport(path);
+			// JasperPrint jp = JasperFillManager.fillReport(jr, null, conn);
+			// JasperViewer.viewReport(jp);
+
+			JasperDesign jd = JRXmlLoader.load("sync.jrxml");
+			
+			HashMap<String, Object> pram = new HashMap<>();
+			modifiedFolders.get(0);
+			
+//			pram.put("fromdate", "2018-08-14");
+//			pram.put("todate", "2018-08-16");
+			JasperReport jr = JasperCompileManager.compileReport(jd);
+			JasperPrint jp = JasperFillManager.fillReport(jr, pram, conn);
+			JasperViewer jv = new JasperViewer(jp, false);
+			jv.setVisible(true);
+
+		} catch (ClassNotFoundException ex) {
+			System.out.println("Error: unable to load driver class!");
+			System.exit(1);
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JRException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
 	}
 
