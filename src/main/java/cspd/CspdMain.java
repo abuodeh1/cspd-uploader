@@ -47,7 +47,9 @@ public class CspdMain {
 				try {
 					sync(args[1], args[2]);
 				} catch (Exception e) {
+					
 					e.printStackTrace();
+
 					System.exit(0);
 				}
 
