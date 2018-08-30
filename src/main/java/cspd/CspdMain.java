@@ -17,6 +17,8 @@ import javax.persistence.EntityManager;
 import javax.persistence.Query;
 import javax.persistence.TypedQuery;
 
+import com.etech.queue.OpexReaderJob;
+
 import cspd.core.CspdMetadata;
 import cspd.core.ModifiedFolder;
 import cspd.entities.BatchDetails;
@@ -53,7 +55,11 @@ public class CspdMain {
 					System.exit(0);
 				}
 
-			} else {
+			} if (args[0].equalsIgnoreCase("counter")) {
+				
+				counterJob();
+				
+			}else {
 				try {
 
 					String batchID = args[0];
@@ -256,8 +262,12 @@ public class CspdMain {
 	private static void closeResourcesAndExit() {
 
 		omniService.complete();
+		
+		if(omniEM.isOpen())
+			omniEM.close();
 
-		cspdEM.close();
+		if(cspdEM.isOpen())
+			cspdEM.close();
 
 		System.exit(0);
 	}
@@ -412,12 +422,13 @@ public class CspdMain {
 
 	private static CspdMetadata fetchCspdMetadata(String serialNumber, int part) throws Exception {
 
-		String metadataQuery = "SELECT b.OfficeCode, " + "	   oe.OfficeName, " + "	   b.FileType, " + "	   dbo.GetFileOldSerial(bd.FileNumber, b.FileType) AS OldSerial, "
-				+ "	   dbo.GetFilePrefix(bd.FileNumber, b.FileType) AS Prefix, " + "	   bd.Year, " + "	   dbo.GetNewSerial(bd.SerialNumber) AS SerialNumber, "
-				+ "	   bd.Part, " + "	   bd.FirstName, " + "	   bd.SecondName, " + "	   bd.ThirdName, " + "	   bd.FamilyName, " + "	   bd.FileNumber, "
-				+ "	   dbo.GetFolderClassCode(bd.SerialNumber) AS FolderClassCode, " + "	   dbo.GetFolderClassText(bd.SerialNumber) AS FolderClassText  " + "FROM Batches b  "
-				+ "	 INNER JOIN BatchDetails bd  " + "		ON b.Id=bd.BatchId  " + "			INNER JOIN OldOffices oe  " + "			ON b.OldOfficeCode = oe.OfficeCode  "
-				+ "WHERE SerialNumber = :serialNumber  " + "AND   Part = :part ";
+		String metadataQuery = "SELECT b.OfficeCode, oe.OfficeName, b.FileType, dbo.GetFileOldSerial(bd.FileNumber, b.FileType) AS OldSerial, "
+							+ "	   dbo.GetFilePrefix(bd.FileNumber, b.FileType) AS Prefix, bd.Year, dbo.GetNewSerial(bd.SerialNumber) AS SerialNumber, "
+							+ "	   bd.Part, bd.FirstName, bd.SecondName, bd.ThirdName, bd.FamilyName, bd.FileNumber, "
+							+ "	   dbo.GetFolderClassCode(bd.SerialNumber) AS FolderClassCode, dbo.GetFolderClassText(bd.SerialNumber) AS FolderClassText  " 
+							+ " FROM Batches b  "
+							+ "	 INNER JOIN BatchDetails bd  ON b.Id=bd.BatchId  INNER JOIN OldOffices oe  ON b.OldOfficeCode = oe.OfficeCode  "
+							+ " WHERE SerialNumber = :serialNumber AND Part = :part ";
 
 		Query cspdMetadataQuery = cspdEM.createNativeQuery(metadataQuery, "CspdMetadataMapping");
 		cspdMetadataQuery.setParameter("serialNumber", serialNumber);
@@ -442,22 +453,55 @@ public class CspdMain {
 
 		prepareResources();
 
-		String changedFolders = "SELECT DISTINCT SUBSDIARYOBJECTNAME AS folderName , " + "	SUBSDIARYOBJECTID AS folderIndex " + "FROM PDBNEWAUDITTRAIL_TABLE A , "
-				+ "	PDBFOLDER F " + "WHERE USERINDEX IN (SELECT USERINDEX " + "					FROM PDBGROUPMEMBER " + "					WHERE GROUPINDEX = (SELECT GROUPINDEX "
-				+ "										FROM PDBGROUP " + "										WHERE GROUPNAME LIKE 'Quality%')) "
-				+ "	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD') " + "	AND TO_DATE(:endDate, 'YYYY-MM-DD') " + "	AND DATETIME > (SELECT MAX(CREATEDDATETIME) "
-				+ "					FROM PDBFOLDER " + "					WHERE FOLDERINDEX = SUBSDIARYOBJECTID) " + "	AND SUBSDIARYOBJECTID IN (	SELECT FOLDERINDEX "
-				+ "								FROM PDBFOLDER P " + "								WHERE P.PARENTFOLDERINDEX IN :indexes "
-				+ "									AND A.COMMNT NOT LIKE '%Trash%' " + "									AND ACTIONID NOT IN (204) ) " + "UNION "
-				+ "SELECT DISTINCT F.NAME AS folderName, " + "	ACTIVEOBJECTID AS folderIndex " + "FROM PDBNEWAUDITTRAIL_TABLE A , " + "	PDBFOLDER F "
-				+ "WHERE USERINDEX IN (SELECT USERINDEX " + "					FROM PDBGROUPMEMBER " + "					WHERE GROUPINDEX = (SELECT GROUPINDEX "
-				+ "										FROM PDBGROUP " + "										WHERE GROUPNAME LIKE 'Quality%' )) "
-				+ "	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD' ) " + "	AND TO_DATE(:endDate, 'YYYY-MM-DD') " + "	AND DATETIME > (SELECT MAX( CREATEDDATETIME) "
-				+ "					FROM PDBFOLDER " + "					WHERE FOLDERINDEX = ACTIVEOBJECTID) " + "	AND SUBSDIARYOBJECTID = -1 "
-				+ "	AND F.FOLDERINDEX = ACTIVEOBJECTID " + "	AND CATEGORY = 'F' " + "	AND ACTIVEOBJECTID IN (	SELECT FOLDERINDEX "
-				+ "							FROM PDBFOLDER P " + "							WHERE P.PARENTFOLDERINDEX IN :indexes "
-				+ "								AND A.COMMNT NOT LIKE '%Trash%' " + "								AND ACTIONID NOT IN (204))";
-
+		String changedFolders = null;
+		
+		changedFolders = "SELECT DISTINCT SUBSDIARYOBJECTNAME AS folderName , " + 
+					"	SUBSDIARYOBJECTID            AS folderIndex  " + 
+					"FROM PDBNEWAUDITTRAIL_TABLE A , " + 
+					"	PDBFOLDER F  " + 
+					"WHERE USERINDEX IN (SELECT USERINDEX  " + 
+					"					FROM PDBGROUPMEMBER  " + 
+					"					WHERE GROUPINDEX = (SELECT GROUPINDEX  " + 
+					"										FROM PDBGROUP  " + 
+					"										WHERE GROUPNAME LIKE 'Quality%'))  " + 
+					(omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:")?
+							"	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD')  AND TO_DATE(:endDate, 'YYYY-MM-DD') ":
+							"	AND DATETIME BETWEEN CONVERT(Date, :startDate, 111) AND CONVERT(Date, :endDate, 111)   ") + 
+					"	AND DATETIME > (SELECT MAX(CREATEDDATETIME)  " + 
+					"					FROM PDBFOLDER  " + 
+					"					WHERE FOLDERINDEX = SUBSDIARYOBJECTID)  " + 
+					"	AND SUBSDIARYOBJECTID IN (	SELECT FOLDERINDEX  " + 
+					"								FROM PDBFOLDER P  " + 
+					"								WHERE P.PARENTFOLDERINDEX IN :indexes AND " + 
+					(omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:")? " A.COMMNT ": " A.COMMENT ") +
+					"									NOT LIKE '%Trash%'  " +
+					"								AND ACTIONID NOT IN (204) )  " + 
+					"UNION  " + 
+					"SELECT DISTINCT F.NAME AS folderName, " + 
+					"	ACTIVEOBJECTID  AS folderIndex  " + 
+					"FROM PDBNEWAUDITTRAIL_TABLE A , " + 
+					"	PDBFOLDER F  " + 
+					"WHERE USERINDEX IN (SELECT USERINDEX  " + 
+					"					FROM PDBGROUPMEMBER  " + 
+					"					WHERE GROUPINDEX = (SELECT GROUPINDEX  " + 
+					"										FROM PDBGROUP  " + 
+					"										WHERE GROUPNAME LIKE 'Quality%' ))  " + 
+					(omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:")?
+							"	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD') AND TO_DATE(:endDate, 'YYYY-MM-DD') " :
+							"	AND DATETIME BETWEEN CONVERT(Date, :startDate, 111) AND CONVERT(Date, :endDate, 111)   ") + 
+					"	AND DATETIME > (SELECT MAX( CREATEDDATETIME)  " + 
+					"					FROM PDBFOLDER  " + 
+					"					WHERE FOLDERINDEX = ACTIVEOBJECTID)  " + 
+					"	AND SUBSDIARYOBJECTID = -1  " + 
+					"	AND F.FOLDERINDEX = ACTIVEOBJECTID  " + 
+					"	AND CATEGORY = 'F'  " + 
+					"	AND ACTIVEOBJECTID IN (	SELECT FOLDERINDEX  " + 
+					"							FROM PDBFOLDER P  " + 
+					"							WHERE P.PARENTFOLDERINDEX IN :indexes  AND " + 
+					(omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:")? " A.COMMNT " : " A.COMMENT ") +
+					"								NOT LIKE '%Trash%'  " + 
+					"								AND ACTIONID NOT IN (204))";
+		
 		List<Integer> indexes = Arrays.asList(Integer.valueOf(props.getProperty("opex.type.1")), Integer.valueOf(props.getProperty("opex.type.2")),
 				Integer.valueOf(props.getProperty("opex.type.3")), Integer.valueOf(props.getProperty("opex.type.4")), Integer.valueOf(props.getProperty("opex.type.5")));
 
@@ -501,4 +545,9 @@ public class CspdMain {
 
 	}
 
+	private static void counterJob() {
+		
+		OpexReaderJob.counterJob();
+
+	}
 }

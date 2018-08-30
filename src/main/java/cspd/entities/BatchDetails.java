@@ -49,7 +49,7 @@ import cspd.core.CspdMetadata;
 @Entity
 @Table(name = "BatchDetails")
 @NamedQueries({
-    @NamedQuery(name = "BatchDetails.findAll", query = "SELECT b FROM BatchDetails b"),
+	@NamedQuery(name = "BatchDetails.findAll", query = "SELECT b FROM BatchDetails b"),
     @NamedQuery(name = "BatchDetails.findById", query = "SELECT b FROM BatchDetails b WHERE b.batchId.id = :id"),
     @NamedQuery(name = "BatchDetails.findByFileNumber", query = "SELECT b FROM BatchDetails b WHERE b.fileNumber = :fileNumber"),
     @NamedQuery(name = "BatchDetails.findByYear", query = "SELECT b FROM BatchDetails b WHERE b.year = :year"),

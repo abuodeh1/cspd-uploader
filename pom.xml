@@ -39,8 +39,8 @@
 		</dependency>
 
 		<dependency>
-			<groupId>omni-dms-impl</groupId>
-			<artifactId>omni-dms-impl</artifactId>
+			<groupId>omni-dms-api</groupId>
+			<artifactId>omni-dms-api</artifactId>
 			<version>1.0</version>
 		</dependency>
 	</dependencies>
