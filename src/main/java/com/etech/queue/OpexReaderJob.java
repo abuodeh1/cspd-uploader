@@ -241,10 +241,12 @@ public class OpexReaderJob extends Thread {
 			String partialBaseIdentifierPart = baseIdentifier.contains("%") ? baseIdentifier.substring(baseIdentifier.indexOf("%") + 1) : "1";
 
 			Query typedBatchDetails = cspdEM.createQuery(
-					"UPDATE BatchDetails b SET b.numberOfPages = :numberOfPages, b.numberOfImages  = :numberOfImages, b.scanDate = :scanDate WHERE b.serialNumber = :serialNumber AND b.part = :part");
+					"UPDATE BatchDetails b SET b.numberOfPages = :numberOfPages, b.numberOfImages  = :numberOfImages, b.scanDate = :scanDate, b.machine = :machine, b.operator = :operator WHERE b.serialNumber = :serialNumber AND b.part = :part");
 			typedBatchDetails.setParameter("numberOfPages", noOfPages);
 			typedBatchDetails.setParameter("numberOfImages", noOfImages);
-			typedBatchDetails.setParameter("scanDate", new Timestamp(new Date().getTime()));
+			typedBatchDetails.setParameter("scanDate", batch.getProcessDate().toGregorianCalendar().getTime());
+			typedBatchDetails.setParameter("machine", batch.getBaseMachine());
+			typedBatchDetails.setParameter("operator", batch.getOperatorName());
 			typedBatchDetails.setParameter("serialNumber", partialBaseIdentifier);
 			typedBatchDetails.setParameter("part", Integer.valueOf(partialBaseIdentifierPart));
 

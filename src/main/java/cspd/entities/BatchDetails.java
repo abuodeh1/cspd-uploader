@@ -84,7 +84,7 @@ public class BatchDetails implements Serializable {
     private String fileNumber;
     @Column(name = "Year")
     private String year;
-    @Basic(optional = false)
+   @Basic(optional = false)
     @Column(name = "FileStatus")
     private int fileStatus;
     @Column(name = "IndexFileNumber")
@@ -144,6 +144,10 @@ public class BatchDetails implements Serializable {
     @Basic(optional = false)
     @Column(name = "NumberOfPages")
     private int numberOfPages;
+    @Column(name = "Machine")
+    private String machine;
+    @Column(name = "Operator")
+    private String operator;
     @Column(name = "ScanDate")
     @Temporal(TemporalType.TIMESTAMP)
     private Date scanDate;
@@ -464,8 +468,24 @@ public class BatchDetails implements Serializable {
         hash += (id != null ? id.hashCode() : 0);
         return hash;
     }
+    
+    public String getMachine() {
+		return machine;
+	}
 
-    @Override
+	public void setMachine(String machine) {
+		this.machine = machine;
+	}
+
+	public String getOperator() {
+		return operator;
+	}
+
+	public void setOperator(String operator) {
+		this.operator = operator;
+	}
+
+	@Override
     public boolean equals(Object object) {
         // TODO: Warning - this method won't work in the case the id fields are not set
         if (!(object instanceof BatchDetails)) {
