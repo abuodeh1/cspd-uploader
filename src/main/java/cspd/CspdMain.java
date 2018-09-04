@@ -59,6 +59,10 @@ public class CspdMain {
 				
 				counterJob();
 				
+			} if (args[0].equalsIgnoreCase("counter-checker")){
+				
+				counterPhysical();
+				
 			}else {
 				try {
 
@@ -548,6 +552,14 @@ public class CspdMain {
 	private static void counterJob() {
 		
 		OpexReaderJob.counterJob();
+
+	}
+	
+	private static void counterPhysical() {
+		
+		OpexReaderJob.counterPhysical();
+		
+		System.exit(0);
 
 	}
 }

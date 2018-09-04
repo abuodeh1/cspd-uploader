@@ -8,10 +8,13 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Comparator;
@@ -246,7 +249,7 @@ public class OpexReaderJob extends Thread {
 			typedBatchDetails.setParameter("numberOfImages", noOfImages);
 			typedBatchDetails.setParameter("scanDate", batch.getProcessDate().toGregorianCalendar().getTime());
 			typedBatchDetails.setParameter("machine", batch.getBaseMachine());
-			typedBatchDetails.setParameter("operator", batch.getOperatorName());
+			typedBatchDetails.setParameter("operator", batch.getOperatorName().split(" ")[0]);
 			typedBatchDetails.setParameter("serialNumber", partialBaseIdentifier);
 			typedBatchDetails.setParameter("part", Integer.valueOf(partialBaseIdentifierPart));
 
@@ -311,6 +314,104 @@ public class OpexReaderJob extends Thread {
 			LocalDateTime date = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
 			System.out.println(date + " - " + file.getName());
 		}
+	}
+
+	public static void counterPhysical() {
+		
+		try {
+			File fileProps = new File("application.properties");
+			FileInputStream in = new FileInputStream(fileProps);
+			props = new Properties();
+			props.load(in);
+			in.close();
+
+			cspdEM = EntityManagerUtil.getCSPDEntityManager(props);
+		} catch (Exception e) {
+			e.printStackTrace();
+
+			System.exit(0);
+		}
+		
+		Calendar oldDate = Calendar.getInstance();
+		oldDate.add(Calendar.YEAR, -10);
+
+		lastPointDate = oldDate;
+
+		OpexReaderJob.isActive = true;
+
+		try {
+
+			opexXmlSourceFolder = new File(props.getProperty("source-folder"));
+
+			if (!opexXmlSourceFolder.exists()) {
+
+				throw new Exception("Source folder not found.");
+
+			}
+
+		} catch (Exception e) {
+
+			System.err.println(e.getMessage());
+
+			System.exit(0);
+
+		}
+		
+		File folders[] = opexXmlSourceFolder.listFiles(new FileFilter() {
+
+			public boolean accept(File file) {
+				if (file.isDirectory()) {
+					return true;
+				}
+
+				return false;
+			}
+		});
+
+		sortFilesByDateCreated(folders);
+
+	
+		int sumOfImages = 0;
+		
+		DateTimeFormatter sdf = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+		
+		Calendar folderDate = Calendar.getInstance();
+		folderDate.setTimeInMillis(getFileCreationEpoch((folders.length > 0? folders[0] : null)));
+		
+		LocalDate date1 = LocalDate.of(folderDate.get(Calendar.YEAR), folderDate.get(Calendar.MONTH)+1, folderDate.get(Calendar.DATE));
+		LocalDate date2 = null;
+		
+		for (File folder : folders) {
+
+			folderDate.setTimeInMillis(getFileCreationEpoch(folder));
+			
+			date2 = LocalDate.of(folderDate.get(Calendar.YEAR), folderDate.get(Calendar.MONTH)+1, folderDate.get(Calendar.DATE));
+			
+			File[] files = folder.listFiles(new FilenameFilter() {
+				@Override
+				public boolean accept(File file, String name) {
+
+						if (name.endsWith(".jpg")) {
+							return true;
+						}
+
+						return false;
+					}
+			});
+
+			if( date1.compareTo(date2) == 0 ) {
+				sumOfImages += files.length;
+			}else {
+				System.out.println("Date : " + date1 + "\timages : " + sumOfImages );
+				sumOfImages = files.length;
+			}
+			
+			date1 = date2;
+
+		}
+		
+		System.out.println("Date : " + date1 + "\timages : " + sumOfImages );
+		
 	}
 
 }
