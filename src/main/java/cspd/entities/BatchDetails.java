@@ -51,11 +51,11 @@ import cspd.core.CspdMetadata;
 @NamedQueries({
 	@NamedQuery(name = "BatchDetails.findAll", query = "SELECT b FROM BatchDetails b"),
     @NamedQuery(name = "BatchDetails.findById", query = "SELECT b FROM BatchDetails b WHERE b.batchId.id = :id"),
+    @NamedQuery(name = "BatchDetails.findBySerialNumberAndPart", query = "SELECT b FROM BatchDetails b WHERE b.serialNumber = :serialNumber and b.part = :part"),
     @NamedQuery(name = "BatchDetails.findByFileNumber", query = "SELECT b FROM BatchDetails b WHERE b.fileNumber = :fileNumber"),
     @NamedQuery(name = "BatchDetails.findByYear", query = "SELECT b FROM BatchDetails b WHERE b.year = :year"),
     @NamedQuery(name = "BatchDetails.findByFileStatus", query = "SELECT b FROM BatchDetails b WHERE b.fileStatus = :fileStatus"),
     @NamedQuery(name = "BatchDetails.findByIndexFileNumber", query = "SELECT b FROM BatchDetails b WHERE b.indexFileNumber = :indexFileNumber"),
-    @NamedQuery(name = "BatchDetails.findBySerialNumber", query = "SELECT b FROM BatchDetails b WHERE b.serialNumber = :serialNumber"),
     @NamedQuery(name = "BatchDetails.findByNeedRestoration", query = "SELECT b FROM BatchDetails b WHERE b.needRestoration = :needRestoration"),
     @NamedQuery(name = "BatchDetails.findByPart", query = "SELECT b FROM BatchDetails b WHERE b.part = :part"),
     @NamedQuery(name = "BatchDetails.findByCreatedBy", query = "SELECT b FROM BatchDetails b WHERE b.createdBy = :createdBy"),
@@ -84,7 +84,7 @@ public class BatchDetails implements Serializable {
     private String fileNumber;
     @Column(name = "Year")
     private String year;
-   @Basic(optional = false)
+    @Basic(optional = false)
     @Column(name = "FileStatus")
     private int fileStatus;
     @Column(name = "IndexFileNumber")
@@ -102,10 +102,6 @@ public class BatchDetails implements Serializable {
     @Column(name = "CreateDate")
     @Temporal(TemporalType.TIMESTAMP)
     private Date createDate;
-    @Basic(optional = false)
-    @Lob
-    @Column(name = "RowVersion")
-    private byte[] rowVersion;
     @Column(name = "DeliveryBatchId")
     private Integer deliveryBatchId;
     @Column(name = "Serial")
@@ -120,22 +116,22 @@ public class BatchDetails implements Serializable {
     @Column(name = "EndPrepare")
     @Temporal(TemporalType.TIMESTAMP)
     private Date endPrepare;
-    @Lob
+    
     @Column(name = "FirstName")
     private String firstName;
-    @Lob
+    
     @Column(name = "SecondName")
     private String secondName;
-    @Lob
+    
     @Column(name = "FamilyName")
     private String familyName;
-    @Lob
+    
     @Column(name = "IndexFirstName")
     private String indexFirstName;
-    @Lob
+    
     @Column(name = "IndexSecondName")
     private String indexSecondName;
-    @Lob
+    
     @Column(name = "IndexFamilyName")
     private String indexFamilyName;
     @Basic(optional = false)
@@ -148,22 +144,24 @@ public class BatchDetails implements Serializable {
     private String machine;
     @Column(name = "Operator")
     private String operator;
+    @Column(name = "NumberOfArchivedImages")
+    private Integer numberOfArchivedImages;
     @Column(name = "ScanDate")
     @Temporal(TemporalType.TIMESTAMP)
     private Date scanDate;
     @Column(name = "FileType")
     private String fileType;
-    @Lob
+    
     @Column(name = "ThirdName")
     private String thirdName;
-    @Lob
+    
     @Column(name = "Comment")
     private String comment;
     @Column(name = "CivilId")
     private Integer civilId;
     @Column(name = "PreparedBy")
     private Integer preparedBy;
-    @Lob
+    
     @Column(name = "MergedFileNumber")
     private String mergedFileNumber;
     @Column(name = "ReferenceId")
@@ -179,13 +177,12 @@ public class BatchDetails implements Serializable {
         this.id = id;
     }
 
-    public BatchDetails(Integer id, String fileNumber, int fileStatus, String createdBy, Date createDate, byte[] rowVersion, int numberOfImages, int numberOfPages) {
+    public BatchDetails(Integer id, String fileNumber, int fileStatus, String createdBy, Date createDate, int numberOfImages, int numberOfPages) {
         this.id = id;
         this.fileNumber = fileNumber;
         this.fileStatus = fileStatus;
         this.createdBy = createdBy;
         this.createDate = createDate;
-        this.rowVersion = rowVersion;
         this.numberOfImages = numberOfImages;
         this.numberOfPages = numberOfPages;
     }
@@ -268,14 +265,6 @@ public class BatchDetails implements Serializable {
 
     public void setCreateDate(Date createDate) {
         this.createDate = createDate;
-    }
-
-    public byte[] getRowVersion() {
-        return rowVersion;
-    }
-
-    public void setRowVersion(byte[] rowVersion) {
-        this.rowVersion = rowVersion;
     }
 
     public Integer getDeliveryBatchId() {
@@ -483,6 +472,14 @@ public class BatchDetails implements Serializable {
 
 	public void setOperator(String operator) {
 		this.operator = operator;
+	}
+	
+	public Integer getNumberOfArchivedImages() {
+		return numberOfArchivedImages;
+	}
+
+	public void setNumberOfArchivedImages(Integer numberOfArchivedImages) {
+		this.numberOfArchivedImages = numberOfArchivedImages;
 	}
 
 	@Override

@@ -188,7 +188,7 @@ public class OpexReaderJob extends Thread {
 
 	}
 
-	private Batch readBatchOXI(File file) throws Exception {
+	private static Batch readBatchOXI(File file) throws Exception {
 
 		Batch batch = null;
 
@@ -331,11 +331,6 @@ public class OpexReaderJob extends Thread {
 
 			System.exit(0);
 		}
-		
-		Calendar oldDate = Calendar.getInstance();
-		oldDate.add(Calendar.YEAR, -10);
-
-		lastPointDate = oldDate;
 
 		OpexReaderJob.isActive = true;
 
@@ -346,6 +341,14 @@ public class OpexReaderJob extends Thread {
 			if (!opexXmlSourceFolder.exists()) {
 
 				throw new Exception("Source folder not found.");
+
+			}
+			
+			opexXmlExtension = props.getProperty("opex-extension");
+
+			if (opexXmlExtension.isEmpty()) {
+
+				throw new Exception("Opex XML file extension unknown");
 
 			}
 
@@ -373,17 +376,96 @@ public class OpexReaderJob extends Thread {
 	
 		int sumOfImages = 0;
 		
-		DateTimeFormatter sdf = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-		
+		File[] filesIIO1 = folders[0].listFiles(new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String name) {
+
+				boolean isAccepted = false;
+
+				String tokens[] = opexXmlExtension.split(";");
+
+				for (String token : tokens) {
+
+					isAccepted = (isAccepted || name.toLowerCase().endsWith(token));
+
+				}
+
+				return isAccepted;
+			}
+		});
+
+		Batch batch1 = null;
+
+		if (filesIIO1.length != 0) {
+
+			File editedFile = null;
+
+			for (int i = 0; i < filesIIO1.length; i++) {
+				if (filesIIO1[i].getName().endsWith(opexXmlExtension.split(";")[0])) {
+					editedFile = filesIIO1[i];
+					break;
+				}
+				editedFile = filesIIO1[i];
+			}
+			try {
+				batch1 = readBatchOXI(editedFile);
+
+			} catch (Exception e) {
+
+				System.err.println(e.getMessage());
+			}
+		}
+
 		Calendar folderDate = Calendar.getInstance();
-		folderDate.setTimeInMillis(getFileCreationEpoch((folders.length > 0? folders[0] : null)));
+		folderDate.setTimeInMillis(batch1.getProcessDate().toGregorianCalendar().getTimeInMillis());
 		
 		LocalDate date1 = LocalDate.of(folderDate.get(Calendar.YEAR), folderDate.get(Calendar.MONTH)+1, folderDate.get(Calendar.DATE));
 		LocalDate date2 = null;
 		
 		for (File folder : folders) {
 
-			folderDate.setTimeInMillis(getFileCreationEpoch(folder));
+			File[] filesIIO = folder.listFiles(new FilenameFilter() {
+				@Override
+				public boolean accept(File dir, String name) {
+
+					boolean isAccepted = false;
+
+					String tokens[] = opexXmlExtension.split(";");
+
+					for (String token : tokens) {
+
+						isAccepted = (isAccepted || name.toLowerCase().endsWith(token));
+
+					}
+
+					return isAccepted;
+				}
+			});
+
+			Batch batch = null;
+			
+			if (filesIIO.length != 0) {
+
+				File editedFile = null;
+
+				for (int i = 0; i < filesIIO.length; i++) {
+					if (filesIIO[i].getName().endsWith(opexXmlExtension.split(";")[0])) {
+						editedFile = filesIIO[i];
+						break;
+					}
+					editedFile = filesIIO[i];
+				}
+				try {
+					batch = readBatchOXI(editedFile);
+
+				} catch (Exception e) {
+
+					System.err.println(e.getMessage());
+				}
+			}
+		
+		
+			folderDate.setTimeInMillis(batch.getProcessDate().toGregorianCalendar().getTimeInMillis());
 			
 			date2 = LocalDate.of(folderDate.get(Calendar.YEAR), folderDate.get(Calendar.MONTH)+1, folderDate.get(Calendar.DATE));
 			

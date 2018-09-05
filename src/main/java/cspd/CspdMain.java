@@ -32,6 +32,7 @@ import etech.omni.core.DataDefinition;
 import etech.omni.core.Document;
 import etech.omni.core.Folder;
 import etech.omni.utils.OmniDocumentUtility;
+import etech.omni.utils.OmniFolderUtility;
 
 public class CspdMain {
 
@@ -63,7 +64,11 @@ public class CspdMain {
 				
 				counterPhysical();
 				
-			}else {
+			} if (args[0].equalsIgnoreCase("update-pdf-pages")){
+				
+				updatePDFPages(); 
+				
+			} else {
 				try {
 
 					String batchID = args[0];
@@ -286,7 +291,7 @@ public class CspdMain {
 			in.close();
 
 			omniService = getOmniService();
-
+			
 			cspdEM = EntityManagerUtil.getCSPDEntityManager(props);
 
 			omniEM = EntityManagerUtil.getOmnidocsEntityManager(props);
@@ -561,5 +566,66 @@ public class CspdMain {
 		
 		System.exit(0);
 
+	}
+	
+	private static void updatePDFPages() {
+		
+		System.out.println("Started...");
+
+		prepareResources();
+		
+		try {
+			
+			OmniFolderUtility omniFolderUtility = omniService.getFolderUtility();
+			OmniDocumentUtility omniDocumentUtility = omniService.getDocumentUtility();
+
+			List<Folder> folders = omniFolderUtility.getFolderList(props.getProperty("opex.type.1"), false);
+			folders.addAll(omniFolderUtility.getFolderList(props.getProperty("opex.type.2"), false));
+			folders.addAll(omniFolderUtility.getFolderList(props.getProperty("opex.type.3"), false));
+			folders.addAll(omniFolderUtility.getFolderList(props.getProperty("opex.type.4"), false));
+			folders.addAll(omniFolderUtility.getFolderList(props.getProperty("opex.type.5"), false));
+			
+			
+			System.out.println("folders : " + folders.size());
+			for(Folder folder : folders) {
+				
+				String partialBaseIdentifier = folder.getFolderName().contains("%") ? folder.getFolderName().substring(0, folder.getFolderName().indexOf("%")) : folder.getFolderName();
+
+				String partialBaseIdentifierPart = folder.getFolderName().contains("%") ? folder.getFolderName().substring(folder.getFolderName().indexOf("%") + 1) : "1";
+				
+				List<Document> documents = omniDocumentUtility.getDocumentList(folder.getFolderIndex(), false);
+				if(documents.size() > 0) {
+					TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findBySerialNumberAndPart", BatchDetails.class);
+					batchDetailsTypeQuery.setParameter("serialNumber", partialBaseIdentifier);
+					batchDetailsTypeQuery.setParameter("part", Integer.valueOf(partialBaseIdentifierPart));
+									
+					List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
+					if(batchDetails.size() > 0) {
+						BatchDetails batchDetailsElem = batchDetails.get(0);
+						batchDetailsElem.setNumberOfArchivedImages(new Integer(documents.get(0).getNoOfPages()));
+						cspdEM.getTransaction().begin();
+						cspdEM.persist(batchDetailsElem);
+						cspdEM.getTransaction().commit();
+						
+						System.out.println("SerialNumber : " + batchDetailsElem.getSerialNumber() + "\t / Archived PDF Pages : " + batchDetailsElem.getNumberOfArchivedImages() + "\t / Updated Successfully.");
+						
+					}
+				}
+			}
+			
+			
+			
+			
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		
+		} finally {
+
+			closeResourcesAndExit();
+			
+		}
+		
+		
 	}
 }
