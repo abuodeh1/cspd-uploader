@@ -78,6 +78,7 @@ public class CspdMain {
 					uploadByBatchId(batchID);
 
 				} catch (NumberFormatException nfe) {
+					System.out.println("there is no argument for batch id");
 					System.exit(0);
 				}
 			}
@@ -120,7 +121,7 @@ public class CspdMain {
 
 			BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
 
-			/*** Prepare omnidocs folder ***/
+			/* Prepare omnidocs folder */
 			try {
 				folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
 			} catch (Exception e) {
@@ -130,7 +131,7 @@ public class CspdMain {
 				continue;
 			}
 
-			// /*checking destination have the same folder*/
+			/*checking destination have the same folder*/
 			String scannerdist = props.getProperty("opex.scanner.output");
 			String folderName = folder.getFolderName();
 
@@ -209,8 +210,12 @@ public class CspdMain {
 			for (int i = 0; i < files.length; i++) {
 
 				try {
-					omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
+					Document addedDocument = omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
 
+					batchDetailsRecord.setNumberOfArchivedImages(addedDocument.getNoOfPages());
+					
+					cspdEM.persist(batchDetailsRecord);
+					
 					Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(),
 							StandardCopyOption.REPLACE_EXISTING);
 
@@ -536,6 +541,24 @@ public class CspdMain {
 				String documentDest = transferFolderDest + System.getProperty("file.separator") + docList.get(j).getDocumentName() + "." + docList.get(j).getCreatedByAppName();
 
 				omniDocumentUtility.exportByIndex(documentDest, docList.get(j).getDocumentIndex());
+				
+				String folderName = modifiedFolders.get(i).getFolderName();
+				
+				String partialBaseIdentifier = folderName.contains("%") ? folderName.substring(0, folderName.indexOf("%")) : folderName;
+				String partialBaseIdentifierPart = folderName.contains("%") ? folderName.substring(folderName.indexOf("%") + 1) : "1";
+				
+				TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findBySerialNumberAndPart", BatchDetails.class);
+				batchDetailsTypeQuery.setParameter("serialNumber", partialBaseIdentifier);
+				batchDetailsTypeQuery.setParameter("part", Integer.valueOf(partialBaseIdentifierPart));
+				
+				List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
+				if(batchDetails.size() > 0) {
+					BatchDetails batchDetailsElem = batchDetails.get(0);
+					batchDetailsElem.setNumberOfArchivedImages(new Integer(docList.get(j).getNoOfPages()));
+					
+					cspdEM.persist(batchDetailsElem);
+					
+				}
 			}
 
 			TypedQuery<ProcessLog> typedProcessLog = cspdEM.createNamedQuery("ProcessLog.findLastBI", ProcessLog.class);
