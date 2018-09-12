@@ -85,6 +85,14 @@ public class CspdMain {
 		}
 	}
 
+	/**
+	 * - upload the document (.pdf) related to a specific batch id
+	 * - prepare the metadata from database query
+	 * - delete the omnidocs folder if exists (depend on the configuration value)
+	 * - upload the document to omnidocs
+	 * - update the NumberOfArchivedImages column with the count pages of the document.
+	 * - move the uploaded document into a specific folder (depend on the configuration value)
+	 */
 	private static void uploadByBatchId(String batchID) {
 
 		prepareResources();
@@ -463,6 +471,14 @@ public class CspdMain {
 		return metadata.get(0);
 	}
 
+	/**
+	 * - the date format is 2018-12-30
+	 * 
+	 * - specify the modified omnidocs folders
+	 * - the original folder is taken as a backup before exporting the latest omnidocs folder
+	 * - update the NumberOfArchivedImages column with the count pages of the document.
+	 * - update the UploadedToDocuWare column to 2.
+	 */
 	private static void sync(String startDate, String endDate) throws Exception {
 
 		prepareResources();
@@ -577,11 +593,18 @@ public class CspdMain {
 
 	}
 
+	/**
+	 * It is a queue job for 
+	 * - reading exported xml file in the scanner raw data to count the number of pages and images
+	 * - update the NumberOfPages and NumberOfImages columns
+	 *  
+	 */
 	private static void counterJob() {
 		
 		OpexReaderJob.counterJob();
 
 	}
+	
 	
 	private static void counterPhysical() {
 		
@@ -591,6 +614,9 @@ public class CspdMain {
 
 	}
 	
+	/**
+	 * The command updates the number of pdf pages that exist in omnidocs folder and update the NumberOfArchivedImages column
+	 */
 	private static void updatePDFPages() {
 		
 		System.out.println("Started...");
