@@ -30,7 +30,7 @@ public class EntityManagerUtil {
 			}
 			
 			properties.put("hibernate.connection.autocommit", "true");
-			properties.put("show_sql", "true");
+			//properties.put("hibernate.show_sql", "true");
 			properties.put("hibernate.temp.use_jdbc_metadata_defaults", "false");
 
 			entityManagerFactory = Persistence.createEntityManagerFactory("cspd", properties);
@@ -64,7 +64,7 @@ public class EntityManagerUtil {
 			}
 			
 			properties.put("hibernate.connection.autocommit", "true");
-			properties.put("show_sql", "true");
+			//properties.put("hibernate.show_sql", "true");
 			properties.put("hibernate.temp.use_jdbc_metadata_defaults", "false");
 
 			entityManagerFactory = Persistence.createEntityManagerFactory("omnidocs", properties);

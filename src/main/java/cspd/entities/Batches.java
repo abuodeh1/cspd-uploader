@@ -76,9 +76,6 @@ public class Batches implements Serializable {
     @Column(name = "Status")
     private int status;
     @Basic(optional = false)
-    @Lob
-    @Column(name = "RowVersion")
-    private byte[] rowVersion;
     @Column(name = "OldOfficeCode")
     private String oldOfficeCode;
     @Column(name = "DeliverDate")
@@ -101,14 +98,13 @@ public class Batches implements Serializable {
         this.id = id;
     }
 
-    public Batches(Integer id, Date batchDateTime, String createdBy, int fileType, String officeCode, int status, byte[] rowVersion, boolean uploaded) {
+    public Batches(Integer id, Date batchDateTime, String createdBy, int fileType, String officeCode, int status, boolean uploaded) {
         this.id = id;
         this.batchDateTime = batchDateTime;
         this.createdBy = createdBy;
         this.fileType = fileType;
         this.officeCode = officeCode;
         this.status = status;
-        this.rowVersion = rowVersion;
         this.uploaded = uploaded;
     }
 
@@ -158,14 +154,6 @@ public class Batches implements Serializable {
 
     public void setStatus(int status) {
         this.status = status;
-    }
-
-    public byte[] getRowVersion() {
-        return rowVersion;
-    }
-
-    public void setRowVersion(byte[] rowVersion) {
-        this.rowVersion = rowVersion;
     }
 
     public String getOldOfficeCode() {
