@@ -152,7 +152,7 @@ public class CspdMain {
 			}
 
 			/* checking destination have the same folder */
-			String scannerdist = props.getProperty("source-folder");
+			String scannerdist = props.getProperty("opex.scanner.output");
 			String folderName = folder.getFolderName();
 
 			opexFolder = new File(scannerdist + System.getProperty("file.separator") + folderName);
@@ -250,13 +250,13 @@ public class CspdMain {
 
 		/*********************************************************/
 
-		if (processStatus = true) {
+		if (processStatus == true) {
 
 			Iterator<BatchDetails> batchDetailsIterator2 = batchDetails.iterator();
 
 			while (batchDetailsIterator2.hasNext()) {
 
-				BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
+				BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator2.next();
 
 				String foldername = batchDetailsRecord.getSerialNumber().toString() + "%" + batchDetailsRecord.getPart();
 
@@ -340,8 +340,8 @@ public class CspdMain {
 		for (int i = 0; i < files.length; i++) {
 
 			try {
-				Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + files[i].getName()).toPath(),
-						StandardCopyOption.REPLACE_EXISTING);
+				 Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") 
+				 	+opexFolder.getPath().substring(opexFolder.getPath().lastIndexOf('\\')) + System.getProperty("file.separator") + files[i].getName()).toPath(),StandardCopyOption.REPLACE_EXISTING);
 
 			} catch (IOException e) {
 
@@ -376,7 +376,7 @@ public class CspdMain {
 
 			cspdEM = EntityManagerUtil.getCSPDEntityManager(props);
 
-			//omniEM = EntityManagerUtil.getOmnidocsEntityManager(props);
+			omniEM = EntityManagerUtil.getOmnidocsEntityManager(props);
 
 		} catch (Exception e) {
 			e.printStackTrace();
