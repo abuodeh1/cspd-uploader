@@ -72,7 +72,8 @@ import cspd.core.CspdMetadata;
     @NamedQuery(name = "BatchDetails.findByFileType", query = "SELECT b FROM BatchDetails b WHERE b.fileType = :fileType"),
     @NamedQuery(name = "BatchDetails.findByCivilId", query = "SELECT b FROM BatchDetails b WHERE b.civilId = :civilId"),
     @NamedQuery(name = "BatchDetails.findByPreparedBy", query = "SELECT b FROM BatchDetails b WHERE b.preparedBy = :preparedBy"),
-    @NamedQuery(name = "BatchDetails.findByReferenceId", query = "SELECT b FROM BatchDetails b WHERE b.referenceId = :referenceId")})
+    @NamedQuery(name = "BatchDetails.findByReferenceId", query = "SELECT b FROM BatchDetails b WHERE b.referenceId = :referenceId"),
+    @NamedQuery(name = "BatchDetails.findByIsCounted", query = "SELECT b FROM BatchDetails b WHERE b.isCounted = 0")})
 public class BatchDetails implements Serializable {
     private static final long serialVersionUID = 1L;
     @Id
@@ -166,6 +167,12 @@ public class BatchDetails implements Serializable {
     private String mergedFileNumber;
     @Column(name = "ReferenceId")
     private Integer referenceId;
+    
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date countedDate;
+    
+    @Column(name = "IsCounted")
+    private Integer isCounted;
     @JoinColumn(name = "BatchId", referencedColumnName = "Id")
     @ManyToOne(optional = false)
     private Batches batchId;
@@ -480,6 +487,26 @@ public class BatchDetails implements Serializable {
 
 	public void setNumberOfArchivedImages(Integer numberOfArchivedImages) {
 		this.numberOfArchivedImages = numberOfArchivedImages;
+	}
+	
+	public Date getCountedDate() {
+		return countedDate;
+	}
+
+	public void setCountedDate(Date countedDate) {
+		this.countedDate = countedDate;
+	}
+
+	public Integer getIsCounted() {
+		return isCounted;
+	}
+
+	public void setIsCounted(Integer isCounted) {
+		this.isCounted = isCounted;
+	}
+
+	public static long getSerialversionuid() {
+		return serialVersionUID;
 	}
 
 	@Override

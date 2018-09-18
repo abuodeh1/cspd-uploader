@@ -8,27 +8,27 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 
 import javax.persistence.EntityManager;
-import javax.persistence.Query;
+import javax.persistence.TypedQuery;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 
 import cspd.EntityManagerUtil;
+import cspd.entities.BatchDetails;
 import opex.element.Batch;
 import opex.element.Batch.Transaction;
 import opex.element.Batch.Transaction.Group;
@@ -40,7 +40,7 @@ public class OpexReaderJob extends Thread {
 
 	public static String opexXmlExtension;
 
-	public static Calendar lastPointDate;
+//	public static Calendar lastPointDate;
 
 	public static File opexXmlSourceFolder;
 	
@@ -56,22 +56,51 @@ public class OpexReaderJob extends Thread {
 	@Override
 	public void run() {
 		System.out.println(Thread.currentThread().getName() + " Started . . . ");
-
+		
 		try {
 			while (isActive) {
+				
+				/**
+				 * Fetch all BatchDetails records by IsCounted
+				 **/
 
-				File folders[] = opexXmlSourceFolder.listFiles(new FileFilter() {
+				TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findByIsCounted", BatchDetails.class);
+				
+				List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
+				
+				List<File> folders = new ArrayList<>();
+				
+				Iterator<BatchDetails> batchDetailsIterator = batchDetails.iterator();
 
-					public boolean accept(File file) {
-						if (file.isDirectory() && (lastPointDate.getTimeInMillis() < getFileCreationEpoch(file))) {
-							return true;
-						}
+				while (batchDetailsIterator.hasNext()) {
 
-						return false;
+					BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
+				
+					String rawSourceFolder = props.getProperty("source-folder");
+
+					String fileName=(batchDetailsRecord.getSerialNumber() + "%" + batchDetailsRecord.getPart() );
+					
+					File rawOpexFolder = new File(rawSourceFolder + System.getProperty("file.separator") + fileName);
+					
+					if( rawOpexFolder.exists() ) {
+						
+						folders.add(rawOpexFolder);
+						
 					}
-				});
-
-				sortFilesByDateCreated(folders);
+				
+				}
+//				File folders[] = opexXmlSourceFolder.listFiles(new FileFilter() {
+//
+//					public boolean accept(File file) {
+//						if (file.isDirectory() && (lastPointDate.getTimeInMillis() < getFileCreationEpoch(file))) {
+//							return true;
+//						}
+//
+//						return false;
+//					}
+//				});
+//
+//				sortFilesByDateCreated(folders);
 
 				for (File folder : folders) {
 
@@ -84,7 +113,7 @@ public class OpexReaderJob extends Thread {
 							String tokens[] = opexXmlExtension.split(";");
 
 							for (String token : tokens) {
-
+								
 								isAccepted = (isAccepted || name.toLowerCase().endsWith(token));
 
 							}
@@ -93,7 +122,11 @@ public class OpexReaderJob extends Thread {
 						}
 					});
 
-					if (files.length != 0) {
+					
+					
+					
+					
+					if (files != null && files.length != 0) {
 
 						File editedFile = null;
 
@@ -104,19 +137,21 @@ public class OpexReaderJob extends Thread {
 							}
 							editedFile = files[i];
 						}
+						
 						try {
 							Batch batch = readBatchOXI(editedFile);
 
-							updateNumberOfPagesAndImages(batch.getBatchIdentifier(), batch);
+							updateNumberOfPagesAndImages(batch);
 
-							System.out.println("File: " + editedFile.getAbsolutePath() + " parsed and database updated.");
+							System.out.println("File: " + editedFile.getAbsolutePath() + " Update successful");
 
 						} catch (Exception e) {
-
-							System.err.println(e.getMessage());
+							
+							System.out.println("File: " + editedFile.getAbsolutePath() + " Update failed");
+							//System.err.println(e.getMessage());
 						}
 
-						lastPointDate.setTimeInMillis(getFileCreationEpoch(editedFile));
+//						lastPointDate.setTimeInMillis(getFileCreationEpoch(editedFile));
 					}
 				}
 
@@ -145,10 +180,10 @@ public class OpexReaderJob extends Thread {
 			System.exit(0);
 		}
 		
-		Calendar oldDate = Calendar.getInstance();
-		oldDate.add(Calendar.YEAR, -10);
-
-		lastPointDate = oldDate;
+//		Calendar oldDate = Calendar.getInstance();
+//		oldDate.add(Calendar.YEAR, -10);
+//
+//		lastPointDate = oldDate;
 
 		OpexReaderJob.isActive = true;
 
@@ -203,9 +238,9 @@ public class OpexReaderJob extends Thread {
 
 		return batch;
 
-	}
+}
 
-	private void updateNumberOfPagesAndImages(String baseIdentifier, Batch batch) throws Exception {
+	private void updateNumberOfPagesAndImages(Batch batch) {
 
 		try {
 
@@ -239,29 +274,39 @@ public class OpexReaderJob extends Thread {
 				}
 			}
 
+			String baseIdentifier = batch.getBatchIdentifier();
+			
 			String partialBaseIdentifier = baseIdentifier.contains("%") ? baseIdentifier.substring(0, baseIdentifier.indexOf("%")) : baseIdentifier;
 
 			String partialBaseIdentifierPart = baseIdentifier.contains("%") ? baseIdentifier.substring(baseIdentifier.indexOf("%") + 1) : "1";
 
-			Query typedBatchDetails = cspdEM.createQuery(
-					"UPDATE BatchDetails b SET b.numberOfPages = :numberOfPages, b.numberOfImages  = :numberOfImages, b.scanDate = :scanDate, b.machine = :machine, b.operator = :operator WHERE b.serialNumber = :serialNumber AND b.part = :part");
-			typedBatchDetails.setParameter("numberOfPages", noOfPages);
-			typedBatchDetails.setParameter("numberOfImages", noOfImages);
-			typedBatchDetails.setParameter("scanDate", batch.getProcessDate().toGregorianCalendar().getTime());
-			typedBatchDetails.setParameter("machine", batch.getBaseMachine());
-			typedBatchDetails.setParameter("operator", batch.getOperatorName().split(" ")[0]);
+			TypedQuery<BatchDetails> typedBatchDetails = cspdEM.createNamedQuery("BatchDetails.findBySerialNumberAndPart", BatchDetails.class);
 			typedBatchDetails.setParameter("serialNumber", partialBaseIdentifier);
 			typedBatchDetails.setParameter("part", Integer.valueOf(partialBaseIdentifierPart));
-
+			
+			List<BatchDetails> batchDetailsResult = typedBatchDetails.getResultList();
+			
 			cspdEM.getTransaction().begin();
-			typedBatchDetails.executeUpdate();
+			
+			for (Iterator<BatchDetails> iterator = batchDetailsResult.iterator(); iterator.hasNext();) {
+				BatchDetails batchDetails = (BatchDetails) iterator.next();
+				batchDetails.setNumberOfPages(noOfPages);
+				batchDetails.setNumberOfImages(noOfImages);
+				batchDetails.setScanDate(batch.getProcessDate().toGregorianCalendar().getTime());
+				batchDetails.setMachine(batch.getBaseMachine());
+				batchDetails.setOperator(batch.getOperatorName().split(" ")[0]);
+				batchDetails.setCountedDate(new Date());
+				batchDetails.setIsCounted(1);
+				
+				cspdEM.persist(batchDetails);
+			}
+
 			cspdEM.getTransaction().commit();
 
 		} catch (Exception e) {
 
 			e.printStackTrace();
 
-			throw e;
 		}
 	}
 
@@ -288,33 +333,33 @@ public class OpexReaderJob extends Thread {
 		return ngoResponse;
 	}
 
-	public static void sortFilesByDateCreated(File[] files) {
-		Arrays.sort(files, new Comparator<File>() {
-			public int compare(File f1, File f2) {
-				long l1 = getFileCreationEpoch(f1);
-				long l2 = getFileCreationEpoch(f2);
-				return Long.valueOf(l1).compareTo(l2);
-			}
-		});
-	}
+//	public static void sortFilesByDateCreated(File[] files) {
+//		Arrays.sort(files, new Comparator<File>() {
+//			public int compare(File f1, File f2) {
+//				long l1 = getFileCreationEpoch(f1);
+//				long l2 = getFileCreationEpoch(f2);
+//				return Long.valueOf(l1).compareTo(l2);
+//			}
+//		});
+//	}
 
-	public static long getFileCreationEpoch(File file) {
-		try {
-			BasicFileAttributes attr = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
-			return attr.creationTime().toInstant().toEpochMilli();
-		} catch (IOException e) {
-			throw new RuntimeException(file.getAbsolutePath(), e);
-		}
-	}
+//	public static long getFileCreationEpoch(File file) {
+//		try {
+//			BasicFileAttributes attr = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+//			return attr.creationTime().toInstant().toEpochMilli();
+//		} catch (IOException e) {
+//			throw new RuntimeException(file.getAbsolutePath(), e);
+//		}
+//	}
 
-	private static void printFiles(File[] files) {
-		for (File file : files) {
-			long m = getFileCreationEpoch(file);
-			Instant instant = Instant.ofEpochMilli(m);
-			LocalDateTime date = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
-			System.out.println(date + " - " + file.getName());
-		}
-	}
+//	private static void printFiles(File[] files) {
+//		for (File file : files) {
+//			long m = getFileCreationEpoch(file);
+//			Instant instant = Instant.ofEpochMilli(m);
+//			LocalDateTime date = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
+//			System.out.println(date + " - " + file.getName());
+//		}
+//	}
 
 	public static void counterPhysical() {
 		
@@ -371,7 +416,7 @@ public class OpexReaderJob extends Thread {
 			}
 		});
 
-		sortFilesByDateCreated(folders);
+		//sortFilesByDateCreated(folders);
 
 	
 		int sumOfImages = 0;

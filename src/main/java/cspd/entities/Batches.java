@@ -52,7 +52,8 @@ import cspd.core.ModifiedFolder;
     @NamedQuery(name = "Batches.findByDeliverDate", query = "SELECT b FROM Batches b WHERE b.deliverDate = :deliverDate"),
     @NamedQuery(name = "Batches.findByBatchCode", query = "SELECT b FROM Batches b WHERE b.batchCode = :batchCode"),
     @NamedQuery(name = "Batches.findByFileSubType", query = "SELECT b FROM Batches b WHERE b.fileSubType = :fileSubType"),
-    @NamedQuery(name = "Batches.findByUploaded", query = "SELECT b FROM Batches b WHERE b.uploaded = :uploaded")})
+    @NamedQuery(name = "Batches.findByUploaded", query = "SELECT b FROM Batches b WHERE b.uploaded = :uploaded"),
+    @NamedQuery(name = "Batches.findByUploadedToOmniDocs", query = "SELECT b FROM Batches b WHERE b.UploadedToOmniDocs = :UploadedToOmniDocs")})
 public class Batches implements Serializable {
     private static final long serialVersionUID = 1L;
     @Id
@@ -88,6 +89,8 @@ public class Batches implements Serializable {
     @Basic(optional = false)
     @Column(name = "uploaded")
     private boolean uploaded;
+    @Column(name = "UploadedToOmniDocs")
+    private Boolean UploadedToOmniDocs;
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "batchId")
     private Collection<BatchDetails> batchDetailsCollection;
 
@@ -98,7 +101,7 @@ public class Batches implements Serializable {
         this.id = id;
     }
 
-    public Batches(Integer id, Date batchDateTime, String createdBy, int fileType, String officeCode, int status, boolean uploaded) {
+    public Batches(Integer id, Date batchDateTime, String createdBy, int fileType, String officeCode, int status, boolean uploaded,boolean UploadedToOmniDocs ) {
         this.id = id;
         this.batchDateTime = batchDateTime;
         this.createdBy = createdBy;
@@ -106,6 +109,7 @@ public class Batches implements Serializable {
         this.officeCode = officeCode;
         this.status = status;
         this.uploaded = uploaded;
+        this.UploadedToOmniDocs=UploadedToOmniDocs;
     }
 
     public Integer getId() {
@@ -204,7 +208,18 @@ public class Batches implements Serializable {
         this.batchDetailsCollection = batchDetailsCollection;
     }
 
-    @Override
+    
+    
+    
+    public Boolean getUploadedToOmniDocs() {
+		return UploadedToOmniDocs;
+	}
+
+	public void setUploadedToOmniDocs(Boolean uploadedToOmniDocs) {
+		UploadedToOmniDocs = uploadedToOmniDocs;
+	}
+
+	@Override
     public int hashCode() {
         int hash = 0;
         hash += (id != null ? id.hashCode() : 0);
