@@ -124,9 +124,6 @@ public class OpexReaderJob extends Thread {
 					});
 
 					
-					
-					
-					
 					if (files != null && files.length != 0) {
 
 						File editedFile = null;
@@ -155,11 +152,11 @@ public class OpexReaderJob extends Thread {
 //						lastPointDate.setTimeInMillis(getFileCreationEpoch(editedFile));
 					}
 				}
-
+				
 				String timeProp = props.getProperty("queue-time-sleep");
-				int waitTime = (timeProp != null? Integer.parseInt(timeProp) : 1);
+				double waitTime = (timeProp != null? Double.parseDouble(timeProp) : 1);
 
-				Thread.sleep(waitTime*60000);
+				Thread.sleep((long)(waitTime*60000));
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -186,7 +183,7 @@ public class OpexReaderJob extends Thread {
 		
 //		Calendar oldDate = Calendar.getInstance();
 //		oldDate.add(Calendar.YEAR, -10);
-//
+
 //		lastPointDate = oldDate;
 
 		OpexReaderJob.isActive = true;
