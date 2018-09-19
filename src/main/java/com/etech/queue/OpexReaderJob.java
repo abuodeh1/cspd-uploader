@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.sql.Time;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -155,7 +156,10 @@ public class OpexReaderJob extends Thread {
 					}
 				}
 
-				Thread.sleep(3000);
+				String timeProp = props.getProperty("queue-time-sleep");
+				int waitTime = (timeProp != null? Integer.parseInt(timeProp) : 1);
+
+				Thread.sleep(waitTime*60000);
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
