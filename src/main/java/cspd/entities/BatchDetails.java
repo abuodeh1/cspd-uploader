@@ -51,6 +51,7 @@ import cspd.core.CspdMetadata;
 @NamedQueries({
 	@NamedQuery(name = "BatchDetails.findAll", query = "SELECT b FROM BatchDetails b"),
     @NamedQuery(name = "BatchDetails.findById", query = "SELECT b FROM BatchDetails b WHERE b.batchId.id = :id"),
+    @NamedQuery(name = "BatchDetails.findByIdAndUploadToOmniDocs", query = "SELECT b FROM BatchDetails b WHERE b.batchId.id = :id and b.uploadedToOmniDocs in (:uploadedToOmniDocs, 0, null)"),
     @NamedQuery(name = "BatchDetails.findBySerialNumberAndPart", query = "SELECT b FROM BatchDetails b WHERE b.serialNumber = :serialNumber and b.part = :part"),
     @NamedQuery(name = "BatchDetails.findByFileNumber", query = "SELECT b FROM BatchDetails b WHERE b.fileNumber = :fileNumber"),
     @NamedQuery(name = "BatchDetails.findByYear", query = "SELECT b FROM BatchDetails b WHERE b.year = :year"),
@@ -176,7 +177,14 @@ public class BatchDetails implements Serializable {
     @JoinColumn(name = "BatchId", referencedColumnName = "Id")
     @ManyToOne(optional = false)
     private Batches batchId;
-
+    @Column(name = "UploadedToOmniDocs")
+    private Integer uploadedToOmniDocs;
+    @Column(name = "UploadedToOmniDocsDate")
+    private Date uploadedToOmniDocsDate;
+    @Column(name = "UploadedToOmniDocsComment")
+    private String uploadedToOmniDocsComment;
+    
+    
     public BatchDetails() {
     }
 
@@ -503,6 +511,30 @@ public class BatchDetails implements Serializable {
 
 	public void setIsCounted(Integer isCounted) {
 		this.isCounted = isCounted;
+	}
+	
+	public Integer getUploadedToOmniDocs() {
+		return uploadedToOmniDocs;
+	}
+
+	public void setUploadedToOmniDocs(Integer uploadedToOmniDocs) {
+		this.uploadedToOmniDocs = uploadedToOmniDocs;
+	}
+
+	public Date getUploadedToOmniDocsDate() {
+		return uploadedToOmniDocsDate;
+	}
+
+	public void setUploadedToOmniDocsDate(Date uploadedToOmniDocsDate) {
+		this.uploadedToOmniDocsDate = uploadedToOmniDocsDate;
+	}
+
+	public String getUploadedToOmniDocsComment() {
+		return uploadedToOmniDocsComment;
+	}
+
+	public void setUploadedToOmniDocsComment(String uploadedToOmniDocsComment) {
+		this.uploadedToOmniDocsComment = uploadedToOmniDocsComment;
 	}
 
 	public static long getSerialversionuid() {

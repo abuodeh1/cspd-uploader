@@ -4,19 +4,11 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
-import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.sql.Time;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -362,6 +354,7 @@ public class OpexReaderJob extends Thread {
 //		}
 //	}
 
+	
 	public static void counterPhysical() {
 		
 		try {

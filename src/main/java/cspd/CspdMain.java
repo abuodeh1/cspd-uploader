@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
@@ -23,7 +24,6 @@ import cspd.core.CspdMetadata;
 import cspd.core.ModifiedFolder;
 import cspd.entities.BatchDetails;
 import cspd.entities.Batches;
-import cspd.entities.ProcessLog;
 import etech.dms.exception.CabinetException;
 import etech.dms.exception.DocumentException;
 import etech.dms.exception.FolderException;
@@ -40,7 +40,7 @@ public class CspdMain {
 	private static EntityManager omniEM = null;
 	private static Properties props;
 	private static OmniService omniService = null;
-
+	private Date currentDate ;
 	public static void main(String[] args) throws Exception {
 
 		if ((args.length != 0)) {
@@ -99,19 +99,12 @@ public class CspdMain {
 	 * @throws Exception
 	 */
 
-	private static void uploadByBatchId(String batchID) {
+	private static void uploadByBatchId(String batchID) throws Exception {
 		File opexFolder = null;
-		prepareResources();
+ 		prepareResources();
 		File[] files = null;
 
-		// String transferFolderDest = props.getProperty("omnidocs.transferDest") +
-		// System.getProperty("file.separator") + opexFolder.getName();
-		// try (Scanner reader = new Scanner(System.in)) {
-
-		// while (!(batchID = reader.nextLine()).equalsIgnoreCase("bye")) {
-
-		cspdEM.getTransaction().begin();
-
+		
 		/*
 		 * Fetch all Batch records by id
 		 */
@@ -120,12 +113,33 @@ public class CspdMain {
 		batchTypeQuery.setParameter("id", Integer.valueOf(batchID));
 		Batches batch = batchTypeQuery.getSingleResult();
 
+		/*
+		 * Check batch status:
+		 * if status = success throw message "The batch already uploaded"
+		 * else change the status to 4 as in progress
+		 * 
+		 */
+		if(batch.getUploadedToOmniDocs()==1) {
+			
+			System.out.println("The batch already uploaded");
+			
+			closeResourcesAndExit();
+			
+		}else {
+			
+			batch.setUploadedToOmniDocs(5);   //in progress
+			
+			save(batch);
+			
+		}
+
 		/**
 		 * Fetch all BatchDetails records by batchID
 		 **/
 
-		TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findById", BatchDetails.class);
+		TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findByIdAndUploadToOmniDocs", BatchDetails.class);
 		batchDetailsTypeQuery.setParameter("id", Integer.valueOf(batchID));
+		batchDetailsTypeQuery.setParameter("uploadedToOmniDocs", 3);
 		List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
 
 		/***
@@ -138,7 +152,7 @@ public class CspdMain {
 		boolean processStatus = true;
 
 		while (batchDetailsIterator.hasNext()) {
-
+			
 			BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
 
 			/* Prepare omnidocs folder */
@@ -147,8 +161,14 @@ public class CspdMain {
 			} catch (Exception e) {
 				folder = new Folder();
 				folder.setFolderName((batch.getFileType() == 1 ? batchDetailsRecord.getSerialNumber() + "%" + batchDetailsRecord.getPart() : batchDetailsRecord.getSerialNumber()));
-				cspdEM.persist(new ProcessLog(new Date(), batchID, folder.getFolderName(), 0, 0, false, e.getMessage()));
+				
+				batchDetailsRecord.setUploadedToOmniDocs(3);
+				batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+				batchDetailsRecord.setUploadedToOmniDocsComment("Unable to prepare the metadata.");
+				save(batchDetailsRecord);
+				
 				processStatus = false;
+				continue;
 			}
 
 			/* checking destination have the same folder */
@@ -158,9 +178,14 @@ public class CspdMain {
 			opexFolder = new File(scannerdist + System.getProperty("file.separator") + folderName);
 
 			if (!opexFolder.exists()) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Opex folder doesn't exist"));
+				//cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Opex folder doesn't exist"));
+				batchDetailsRecord.setUploadedToOmniDocs(3);
+				batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+				batchDetailsRecord.setUploadedToOmniDocsComment("Opex folder doesn't exist");
+				save(batchDetailsRecord);
+				
 				processStatus = false;
-				break;
+				continue;
 			}
 
 			/* checking opex folder contents */
@@ -180,10 +205,14 @@ public class CspdMain {
 				}
 			});
 
-			if (files.length == 0) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "The opex folder is empty"));
+			if (files != null & files.length == 0) {
+				batchDetailsRecord.setUploadedToOmniDocs(3);
+				batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+				batchDetailsRecord.setUploadedToOmniDocsComment("The opex folder is empty");
+				save(batchDetailsRecord);
+				
 				processStatus = false;
-				break;
+				continue;
 			}
 
 			/* delete the omnidocs folder if exists */
@@ -194,9 +223,13 @@ public class CspdMain {
 						omniService.getFolderUtility().delete(omniFolder.get(0).getFolderIndex());
 					}
 				} catch (FolderException e) {
-					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to find or delete the exist of omnidocs folder"));
+					batchDetailsRecord.setUploadedToOmniDocs(3);
+					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+					batchDetailsRecord.setUploadedToOmniDocsComment("Unable to find or delete the existing omnidocs folder");
+					save(batchDetailsRecord);
+
 					processStatus = false;
-					break;
+					continue;
 				}
 			}
 
@@ -205,9 +238,13 @@ public class CspdMain {
 			try {
 				addedFolder = omniService.getFolderUtility().addFolder(folder.getParentFolderIndex(), folder);
 			} catch (FolderException e) {
-				cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to create the omnidocs folder"));
+				batchDetailsRecord.setUploadedToOmniDocs(3);
+				batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+				batchDetailsRecord.setUploadedToOmniDocsComment("Unable to create the omnidocs folder");
+				save(batchDetailsRecord);
+				
 				processStatus = false;
-				break;
+				continue;
 			}
 
 			/*
@@ -219,90 +256,121 @@ public class CspdMain {
 
 				try {
 
-					folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
+					/**
+					 * Check the file size if equals 0, throw message as failed
+					 */
+					long fileSize= files[0].length();
+					if(fileSize==0) {
+						
+						batchDetailsRecord.setUploadedToOmniDocs(3);
+						batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+						batchDetailsRecord.setUploadedToOmniDocsComment("The Document size is 0 or file is corrupted");
+						
+						processStatus = false;
+						continue;
 
+					}
+					
 					Document addedDocument = omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
 
 					batchDetailsRecord.setNumberOfArchivedImages(addedDocument.getNoOfPages());
-
-					cspdEM.persist(batchDetailsRecord);
-
+					batchDetailsRecord.setUploadedToOmniDocs(1);
+					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+					batchDetailsRecord.setUploadedToOmniDocsComment(null);
+					save(batchDetailsRecord);
+					
+					/**
+					 * 
+					 * move the opex folder 
+					 * 
+					 * update batch heartbeat by now 
+					 **/
+					try {
+						/* move the folder to uploaded and delete from opex folder */
+						String foldername = batchDetailsRecord.getSerialNumber().toString() + "%" + batchDetailsRecord.getPart();
+	
+						String scannerdistt = props.getProperty("opex.scanner.output") + System.getProperty("file.separator") + foldername; /* ex: D:/Scanner_out/0000023+01+018%1 */
+	
+						File opexFldr = new File(scannerdistt);
+	
+						moveOpexFoler(opexFldr);
+					
+					}catch (IOException e) {
+						// Unable To Move the folder to opex folder
+						batchDetailsRecord.setUploadedToOmniDocsComment(e.getMessage());
+						batchDetailsRecord.setUploadedToOmniDocs(4);
+						batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+						save(batchDetailsRecord);
+						
+						processStatus = false;
+						continue;
+					}		
+					
+					batch.setHeartBeat(new Date());
+					
+					save(Arrays.asList(batch, batchDetailsRecord));
+					
 				} catch (DocumentException e) {
-					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to upload the opex folder's document"));
-					processStatus = false;
-					break;
-				} catch (IOException e) {
-					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to upload the opex folder's document"));
-					processStatus = false;
-					break;
-				} catch (Exception e) {
-					cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to upload the opex folder's document"));
-					processStatus = false;
-					break;
-				}
+					//cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to upload the opex folder's document"));
+					batchDetailsRecord.setUploadedToOmniDocs(3);
+					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+					batchDetailsRecord.setUploadedToOmniDocsComment("Unable to upload the opex folder's document");
+					
+					save(batchDetailsRecord);
 
+					processStatus = false;
+					continue;
+					
+				} 
+	
+			
 			}
 		}
-
-		batch.setUploadedToOmniDocs(true);
-		cspdEM.persist(batch);
-		cspdEM.getTransaction().commit();
-
-		/*********************************************************/
 
 		if (processStatus == true) {
+			
+			batch.setUploadedToOmniDocs(1);
 
-			Iterator<BatchDetails> batchDetailsIterator2 = batchDetails.iterator();
+			batch.setUploadedToOmniDocsDate(new Date());
 
-			while (batchDetailsIterator2.hasNext()) {
-
-				BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator2.next();
-
-				String foldername = batchDetailsRecord.getSerialNumber().toString() + "%" + batchDetailsRecord.getPart();
-
-				String scannerdist = props.getProperty("opex.scanner.output") + System.getProperty("file.separator") + foldername; /* ex: D:/Scanner_out/0000023+01+018%1 */
-
-				File opexFldr = new File(scannerdist);
-
-				moveOpexFoler(opexFldr);
-			}
+		}else {
+			
+			batch.setUploadedToOmniDocs(3);//fail status
+			
+			batch.setUploadedToOmniDocsDate(new Date());
 		}
 
-		// try {
-		//
-		// /* take backup of uploaded folder */
-		//
-		// for (int i = 0; i < files.length; i++) {
-		// String transferFolderDest = props.getProperty("omnidocs.transferDest" +
-		// System.getProperty("file.separator"));
-		//
-		// File transferFolder = new File(transferFolderDest);
-		//
-		// moveToBackupFolder(transferFolder);
-		// Files.move(files[i].toPath(), new File(transferFolderDest +
-		// System.getProperty("file.separator") + files[i].getName()).toPath(),
-		// StandardCopyOption.REPLACE_EXISTING);
-		//
-		// }
-		//
-		// } catch (Exception e) {
-		// e.printStackTrace();
-		// }
-		// try {
-		//
-		// String transferFolderDest = props.getProperty("omnidocs.transferDest" +
-		// System.getProperty("file.separator") + "saed");
-		//
-		// uploadCleanup(transferFolderDest, opexFolder);
-		//
-		// } catch (Exception e) {
-		// e.printStackTrace();
-		// }
-		/*******************************************/
+		save(batch);
+
 		closeResourcesAndExit();
+		
+	}
+	
+	
+	private static void save(Object entity){
+		
+		cspdEM.getTransaction().begin();
+		
+		cspdEM.persist(entity);
+		
+		cspdEM.getTransaction().commit();
+
+	}
+	
+	private static void save(List entities){
+		
+		cspdEM.getTransaction().begin();
+		
+		for (Iterator entity = entities.iterator(); entity.hasNext();) {
+			cspdEM.persist(entity.next());
+		}
+
+		cspdEM.getTransaction().commit();
+
 	}
 
-	private static void moveOpexFoler(File opexFolder) {
+
+	private static void moveOpexFoler(File opexFolder) throws IOException{
 		
 		/*move to backup folder if exist create new one with current date  */
 		
@@ -317,21 +385,28 @@ public class CspdMain {
 
 	}
 
-	private static void moveToBackupFolder(File transferFolder) {
+	private static void moveToBackupFolder(File transferFolder) throws IOException {
 
 		if (transferFolder.exists()) {
 
 			SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
 			String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
 
-			transferFolder.renameTo(new File((transferFolder + " - " + currentDateTime)));
+			boolean isRenamed = transferFolder.renameTo(new File((transferFolder + " - " + currentDateTime)));
+			if(!isRenamed) {
+				throw new IOException("Unable to backup the existing old opex folder");
+			}
+			
 		}
 
-		transferFolder.mkdir();
+		boolean isCreated = transferFolder.mkdir();
+		if(!isCreated) {
+			throw new IOException("Unable to create a new folder to backup the existing old opex folder");
+		}
 
 	}
 
-	private static void uploadCleanup(File opexFolder) {
+	private static void uploadCleanup(File opexFolder) throws IOException {
 
 		// after the upload delete the uploaded opex folder and move to backup folder
 		String transferFolderDest = props.getProperty("omnidocs.transferDest");
@@ -344,10 +419,14 @@ public class CspdMain {
 				 	+opexFolder.getPath().substring(opexFolder.getPath().lastIndexOf('\\')) + System.getProperty("file.separator") + files[i].getName()).toPath(),StandardCopyOption.REPLACE_EXISTING);
 
 			} catch (IOException e) {
-
+				new IOException("Error in moving the opex folder");
 			}
 		}
-		opexFolder.delete();
+
+		boolean isDeleted = opexFolder.delete();
+		if(!isDeleted) {
+			throw new IOException("Unable to delete the opex folder during the moving from the opex source folder");
+		}
 	}
 
 	private static void closeResourcesAndExit() {
@@ -613,23 +692,26 @@ public class CspdMain {
 				batchDetailsTypeQuery.setParameter("part", Integer.valueOf(partialBaseIdentifierPart));
 
 				List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
-				if (batchDetails.size() > 0) {
-					BatchDetails batchDetailsElem = batchDetails.get(0);
+				for (Iterator<BatchDetails> iterator = batchDetails.iterator(); iterator.hasNext();) {
+					BatchDetails batchDetailsElem = iterator.next();
+	
 					batchDetailsElem.setNumberOfArchivedImages(new Integer(docList.get(j).getNoOfPages()));
-
+					batchDetailsElem.setUploadedToOmniDocs(2);
+					batchDetailsElem.setUploadedToOmniDocsDate(new Date());
+					
 					cspdEM.persist(batchDetailsElem);
-
+					
 				}
 			}
 
-			TypedQuery<ProcessLog> typedProcessLog = cspdEM.createNamedQuery("ProcessLog.findLastBI", ProcessLog.class);
-			typedProcessLog.setParameter("serialNumber", modifiedFolders.get(i).getFolderName());
-			try {
-				ProcessLog processLog = typedProcessLog.getSingleResult();
-				processLog.setUploadedToDocuWare(2);
-				cspdEM.persist(processLog);
-			} catch (Exception e) {
-			}
+//			TypedQuery<ProcessLog> typedProcessLog = cspdEM.createNamedQuery("ProcessLog.findLastBI", ProcessLog.class);
+//			typedProcessLog.setParameter("serialNumber", modifiedFolders.get(i).getFolderName());
+//			try {
+//				ProcessLog processLog = typedProcessLog.getSingleResult();
+//				processLog.setUploadedToDocuWare(2);
+//				cspdEM.persist(processLog);
+//			} catch (Exception e) {
+//			}
 
 		}
 

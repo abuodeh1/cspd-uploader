@@ -53,7 +53,8 @@ import cspd.core.ModifiedFolder;
     @NamedQuery(name = "Batches.findByBatchCode", query = "SELECT b FROM Batches b WHERE b.batchCode = :batchCode"),
     @NamedQuery(name = "Batches.findByFileSubType", query = "SELECT b FROM Batches b WHERE b.fileSubType = :fileSubType"),
     @NamedQuery(name = "Batches.findByUploaded", query = "SELECT b FROM Batches b WHERE b.uploaded = :uploaded"),
-    @NamedQuery(name = "Batches.findByUploadedToOmniDocs", query = "SELECT b FROM Batches b WHERE b.UploadedToOmniDocs = :UploadedToOmniDocs")})
+    @NamedQuery(name = "Batches.findByUploadedToOmniDocs", query = "SELECT b FROM Batches b WHERE b.uploadedToOmniDocs = :uploadedToOmniDocs")})
+
 public class Batches implements Serializable {
     private static final long serialVersionUID = 1L;
     @Id
@@ -90,7 +91,14 @@ public class Batches implements Serializable {
     @Column(name = "uploaded")
     private boolean uploaded;
     @Column(name = "UploadedToOmniDocs")
-    private Boolean UploadedToOmniDocs;
+    private Integer uploadedToOmniDocs;
+    @Column(name = "UploadedToOmniDocsDate")
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date uploadedToOmniDocsDate;
+    
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date heartBeat;
+    
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "batchId")
     private Collection<BatchDetails> batchDetailsCollection;
 
@@ -101,7 +109,7 @@ public class Batches implements Serializable {
         this.id = id;
     }
 
-    public Batches(Integer id, Date batchDateTime, String createdBy, int fileType, String officeCode, int status, boolean uploaded,boolean UploadedToOmniDocs ) {
+    public Batches(Integer id, Date batchDateTime, String createdBy, int fileType, String officeCode, int status, boolean uploaded,Integer uploadedToOmniDocs,Date  uploadedToOmniDocsDate ) {
         this.id = id;
         this.batchDateTime = batchDateTime;
         this.createdBy = createdBy;
@@ -109,7 +117,8 @@ public class Batches implements Serializable {
         this.officeCode = officeCode;
         this.status = status;
         this.uploaded = uploaded;
-        this.UploadedToOmniDocs=UploadedToOmniDocs;
+        this.uploadedToOmniDocs=uploadedToOmniDocs;
+        this.uploadedToOmniDocsDate=uploadedToOmniDocsDate;
     }
 
     public Integer getId() {
@@ -208,15 +217,28 @@ public class Batches implements Serializable {
         this.batchDetailsCollection = batchDetailsCollection;
     }
 
-    
-    
-    
-    public Boolean getUploadedToOmniDocs() {
-		return UploadedToOmniDocs;
+	public Integer getUploadedToOmniDocs() {
+		return uploadedToOmniDocs;
 	}
 
-	public void setUploadedToOmniDocs(Boolean uploadedToOmniDocs) {
-		UploadedToOmniDocs = uploadedToOmniDocs;
+	public void setUploadedToOmniDocs(Integer uploadedToOmniDocs) {
+		this.uploadedToOmniDocs = uploadedToOmniDocs;
+	}
+
+	public Date getUploadedToOmniDocsDate() {
+		return uploadedToOmniDocsDate;
+	}
+
+	public void setUploadedToOmniDocsDate(Date uploadedToOmniDocsDate) {
+		this.uploadedToOmniDocsDate = uploadedToOmniDocsDate;
+	}
+
+	public Date getHeartBeat() {
+		return heartBeat;
+	}
+
+	public void setHeartBeat(Date heartBeat) {
+		this.heartBeat = heartBeat;
 	}
 
 	@Override
