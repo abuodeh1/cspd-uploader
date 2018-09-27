@@ -50,6 +50,9 @@ public class OpexReaderJob extends Thread {
 	public void run() {
 		System.out.println(Thread.currentThread().getName() + " Started . . . ");
 		
+		String timeProp = props.getProperty("queue-time-sleep");
+		double waitTime = (timeProp != null? Double.parseDouble(timeProp) : 1);
+
 		try {
 			while (isActive) {
 				
@@ -144,9 +147,6 @@ public class OpexReaderJob extends Thread {
 //						lastPointDate.setTimeInMillis(getFileCreationEpoch(editedFile));
 					}
 				}
-				
-				String timeProp = props.getProperty("queue-time-sleep");
-				double waitTime = (timeProp != null? Double.parseDouble(timeProp) : 1);
 
 				Thread.sleep((long)(waitTime*60000));
 			}

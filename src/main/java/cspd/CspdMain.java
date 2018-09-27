@@ -3,11 +3,13 @@ package cspd;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
@@ -40,7 +42,8 @@ public class CspdMain {
 	private static EntityManager omniEM = null;
 	private static Properties props;
 	private static OmniService omniService = null;
-	private Date currentDate ;
+	private Date currentDate;
+
 	public static void main(String[] args) throws Exception {
 
 		if ((args.length != 0)) {
@@ -56,18 +59,15 @@ public class CspdMain {
 					System.exit(0);
 				}
 
-			}else
-			if (args[0].equalsIgnoreCase("counter")) {
+			} else if (args[0].equalsIgnoreCase("counter")) {
 
 				counterJob();
 
-			}else
-			if (args[0].equalsIgnoreCase("counter-checker")) {
+			} else if (args[0].equalsIgnoreCase("counter-checker")) {
 
 				counterPhysical();
 
-			}else
-			if (args[0].equalsIgnoreCase("update-pdf-pages")) {
+			} else if (args[0].equalsIgnoreCase("update-pdf-pages")) {
 
 				updatePDFPages();
 
@@ -99,268 +99,308 @@ public class CspdMain {
 	 * @throws Exception
 	 */
 
-	private static void uploadByBatchId(String batchID) throws Exception {
+	private static void uploadByBatchId(String batchID) {
 		File opexFolder = null;
- 		prepareResources();
+		prepareResources();
 		File[] files = null;
 
-		
-		/*
-		 * Fetch all Batch records by id
-		 */
+		try {
+			/*
+			 * Fetch all Batch records by id
+			 */
+			TypedQuery<Batches> batchTypeQuery = cspdEM.createNamedQuery("Batches.findById", Batches.class);
+			batchTypeQuery.setParameter("id", Integer.valueOf(batchID));
+			Batches batch = batchTypeQuery.getSingleResult();
 
-		TypedQuery<Batches> batchTypeQuery = cspdEM.createNamedQuery("Batches.findById", Batches.class);
-		batchTypeQuery.setParameter("id", Integer.valueOf(batchID));
-		Batches batch = batchTypeQuery.getSingleResult();
+			/*
+			 * Check batch status: if status = success throw message
+			 * "The batch already uploaded" else change the status to 4 as in progress
+			 * 
+			 */
+			if (batch.getUploadedToOmniDocs() == 1) {
 
-		/*
-		 * Check batch status:
-		 * if status = success throw message "The batch already uploaded"
-		 * else change the status to 4 as in progress
-		 * 
-		 */
-		if(batch.getUploadedToOmniDocs()==1) {
-			
-			System.out.println("The batch already uploaded");
-			
-			closeResourcesAndExit();
-			
-		}else {
-			
-			batch.setUploadedToOmniDocs(5);   //in progress
-			
-			save(batch);
-			
-		}
+				System.out.println("The batch already uploaded");
 
-		/**
-		 * Fetch all BatchDetails records by batchID
-		 **/
+				closeResourcesAndExit();
 
-		TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findByIdAndUploadToOmniDocs", BatchDetails.class);
-		batchDetailsTypeQuery.setParameter("id", Integer.valueOf(batchID));
-		batchDetailsTypeQuery.setParameter("uploadedToOmniDocs", 3);
-		List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
+			} else {
 
-		/***
-		 * Fetch folder meta data by serialNumber and part for each batchDetials record
-		 ***/
+				batch.setUploadedToOmniDocs(5); // in progress
 
-		Folder folder = null;
-		Iterator<BatchDetails> batchDetailsIterator = batchDetails.iterator();
+				save(batch);
 
-		boolean processStatus = true;
-
-		while (batchDetailsIterator.hasNext()) {
-			
-			BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
-
-			/* Prepare omnidocs folder */
-			try {
-				folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
-			} catch (Exception e) {
-				folder = new Folder();
-				folder.setFolderName((batch.getFileType() == 1 ? batchDetailsRecord.getSerialNumber() + "%" + batchDetailsRecord.getPart() : batchDetailsRecord.getSerialNumber()));
-				
-				batchDetailsRecord.setUploadedToOmniDocs(3);
-				batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
-				batchDetailsRecord.setUploadedToOmniDocsComment("Unable to prepare the metadata.");
-				save(batchDetailsRecord);
-				
-				processStatus = false;
-				continue;
 			}
 
-			/* checking destination have the same folder */
-			String scannerdist = props.getProperty("opex.scanner.output");
-			String folderName = folder.getFolderName();
+			/**
+			 * Fetch all BatchDetails records by batchID
+			 **/
 
-			opexFolder = new File(scannerdist + System.getProperty("file.separator") + folderName);
+			TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findByIdAndUploadToOmniDocs", BatchDetails.class);
+			batchDetailsTypeQuery.setParameter("id", Integer.valueOf(batchID));
+			batchDetailsTypeQuery.setParameter("uploadedToOmniDocs", 3);
+			List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
 
-			if (!opexFolder.exists()) {
-				//cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Opex folder doesn't exist"));
-				batchDetailsRecord.setUploadedToOmniDocs(3);
-				batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
-				batchDetailsRecord.setUploadedToOmniDocsComment("Opex folder doesn't exist");
-				save(batchDetailsRecord);
-				
-				processStatus = false;
-				continue;
-			}
+			/***
+			 * Fetch folder meta data by serialNumber and part for each batchDetials record
+			 ***/
 
-			/* checking opex folder contents */
-			files = opexFolder.listFiles(new FileFilter() {
+			Folder folder = null;
+			Iterator<BatchDetails> batchDetailsIterator = batchDetails.iterator();
 
-				@Override
-				public boolean accept(File file) {
+			boolean processStatus = true;
 
-					if (file.isDirectory())
+			while (batchDetailsIterator.hasNext()) {
 
-						return false;
+				BatchDetails batchDetailsRecord = (BatchDetails) batchDetailsIterator.next();
 
-					if (!file.getName().toLowerCase().endsWith(".pdf"))
-						return false;
-
-					return true;
-				}
-			});
-
-			if (files != null & files.length == 0) {
-				batchDetailsRecord.setUploadedToOmniDocs(3);
-				batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
-				batchDetailsRecord.setUploadedToOmniDocsComment("The opex folder is empty");
-				save(batchDetailsRecord);
-				
-				processStatus = false;
-				continue;
-			}
-
-			/* delete the omnidocs folder if exists */
-			if (props.getProperty("omnidocs.deleteFolderIfExist").equalsIgnoreCase("true")) {
+				/* Prepare omnidocs folder */
 				try {
-					List<Folder> omniFolder = omniService.getFolderUtility().findFolderByName(props.getProperty("opex.type." + batch.getFileType()), folderName);
-					if (omniFolder.size() > 0) {
-						omniService.getFolderUtility().delete(omniFolder.get(0).getFolderIndex());
+					folder = perpareOmniFolder(omniService, batch.getFileType(), batchDetailsRecord.getSerialNumber(), batchDetailsRecord.getPart());
+				} catch (Exception e) {
+					folder = new Folder();
+					folder.setFolderName((batch.getFileType() == 1 ? batchDetailsRecord.getSerialNumber() + "%" + batchDetailsRecord.getPart() : batchDetailsRecord.getSerialNumber()));
+
+					batchDetailsRecord.setUploadedToOmniDocs(3);
+					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+					batchDetailsRecord.setUploadedToOmniDocsComment("Unable to prepare the metadata.");
+					save(batchDetailsRecord);
+
+					processStatus = false;
+					continue;
+				}
+
+				/* checking destination have the same folder */
+				String scannerdist = props.getProperty("opex.scanner.output");
+				String folderName = folder.getFolderName();
+
+				opexFolder = new File(scannerdist + System.getProperty("file.separator") + folderName);
+
+				if (!opexFolder.exists()) {
+					// cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0,
+					// 0, false, "Opex folder doesn't exist"));
+					batchDetailsRecord.setUploadedToOmniDocs(3);
+					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+					batchDetailsRecord.setUploadedToOmniDocsComment("Opex folder doesn't exist");
+					save(batchDetailsRecord);
+
+					processStatus = false;
+					continue;
+				}
+
+				/* checking opex folder contents */
+				files = opexFolder.listFiles(new FileFilter() {
+
+					@Override
+					public boolean accept(File file) {
+
+						if (file.isDirectory())
+
+							return false;
+
+						if (!file.getName().toLowerCase().endsWith(".pdf"))
+							return false;
+
+						return true;
 					}
+				});
+
+				if (files != null & files.length == 0) {
+					batchDetailsRecord.setUploadedToOmniDocs(3);
+					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+					batchDetailsRecord.setUploadedToOmniDocsComment("The opex folder is empty");
+					save(batchDetailsRecord);
+
+					processStatus = false;
+					continue;
+				}
+
+				/* delete the omnidocs folder if exists */
+				if (props.getProperty("omnidocs.deleteFolderIfExist").equalsIgnoreCase("true")) {
+					try {
+						List<Folder> omniFolder = omniService.getFolderUtility().findFolderByName(props.getProperty("opex.type." + batch.getFileType()), folderName);
+						if (omniFolder.size() > 0) {
+							omniService.getFolderUtility().delete(omniFolder.get(0).getFolderIndex());
+						}
+					} catch (FolderException e) {
+						batchDetailsRecord.setUploadedToOmniDocs(3);
+						batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+						batchDetailsRecord.setUploadedToOmniDocsComment("Unable to find or delete the existing omnidocs folder");
+						save(batchDetailsRecord);
+
+						processStatus = false;
+						continue;
+
+					} catch (Exception e) {
+						batchDetailsRecord.setUploadedToOmniDocs(3);
+						batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+						batchDetailsRecord.setUploadedToOmniDocsComment("Unknown Error: " + e.getMessage());
+						save(batchDetailsRecord);
+
+						processStatus = false;
+						continue;
+					}
+				}
+
+				/* upload folder into omnidocs */
+				Folder addedFolder = null;
+				try {
+					addedFolder = omniService.getFolderUtility().addFolder(folder.getParentFolderIndex(), folder);
 				} catch (FolderException e) {
 					batchDetailsRecord.setUploadedToOmniDocs(3);
 					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
-					batchDetailsRecord.setUploadedToOmniDocsComment("Unable to find or delete the existing omnidocs folder");
+					batchDetailsRecord.setUploadedToOmniDocsComment("Unable to create the omnidocs folder");
+					save(batchDetailsRecord);
+
+					processStatus = false;
+					continue;
+				} catch (Exception e) {
+					batchDetailsRecord.setUploadedToOmniDocs(3);
+					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+					batchDetailsRecord.setUploadedToOmniDocsComment("Unknown Error: " + e.getMessage());
 					save(batchDetailsRecord);
 
 					processStatus = false;
 					continue;
 				}
-			}
 
-			/* upload folder into omnidocs */
-			Folder addedFolder = null;
-			try {
-				addedFolder = omniService.getFolderUtility().addFolder(folder.getParentFolderIndex(), folder);
-			} catch (FolderException e) {
-				batchDetailsRecord.setUploadedToOmniDocs(3);
-				batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
-				batchDetailsRecord.setUploadedToOmniDocsComment("Unable to create the omnidocs folder");
-				save(batchDetailsRecord);
-				
-				processStatus = false;
-				continue;
-			}
+				/*
+				 * create opex folder in transfer destination and backing up if there is a one
+				 */
 
-			/*
-			 * create opex folder in transfer destination and backing up if there is a one
-			 */
+				/* upload the opex folder contents to omnidocs */
+				for (int i = 0; i < files.length; i++) {
 
-			/* upload the opex folder contents to omnidocs */
-			for (int i = 0; i < files.length; i++) {
+					try {
 
-				try {
+						/**
+						 * Check the file size if equals 0, throw message as failed
+						 */
+						long fileSize = files[0].length();
+						if (fileSize == 0) {
 
-					/**
-					 * Check the file size if equals 0, throw message as failed
-					 */
-					long fileSize= files[0].length();
-					if(fileSize==0) {
-						
+							batchDetailsRecord.setUploadedToOmniDocs(3);
+							batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+							batchDetailsRecord.setUploadedToOmniDocsComment("The Document size is 0 or file is corrupted");
+							save(batchDetailsRecord);
+
+							processStatus = false;
+							continue;
+
+						}
+
+						Document addedDocument = omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
+
+						batchDetailsRecord.setNumberOfArchivedImages(addedDocument.getNoOfPages());
+						batchDetailsRecord.setUploadedToOmniDocs(1);
+						batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+						batchDetailsRecord.setUploadedToOmniDocsComment(null);
+						save(batchDetailsRecord);
+
+						/**
+						 * 
+						 * move the opex folder
+						 * 
+						 * update batch heartbeat by now
+						 **/
+						try {
+							/* move the folder to uploaded and delete from opex folder */
+							String foldername = batchDetailsRecord.getSerialNumber().toString() + "%" + batchDetailsRecord.getPart();
+
+							String scannerdistt = props.getProperty("opex.scanner.output") + System.getProperty("file.separator") + foldername; /* ex: D:/Scanner_out/0000023+01+018%1 */
+
+							File opexFldr = new File(scannerdistt);
+
+							moveOpexFoler(opexFldr);
+
+						} catch (IOException e) {
+							// Unable To Move the folder to opex folder
+							batchDetailsRecord.setUploadedToOmniDocsComment(e.getMessage());
+							batchDetailsRecord.setUploadedToOmniDocs(4);
+							batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+							save(batchDetailsRecord);
+
+							processStatus = false;
+							continue;
+						} catch (Exception e) {
+							batchDetailsRecord.setUploadedToOmniDocs(4);
+							batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+							batchDetailsRecord.setUploadedToOmniDocsComment("Unknown Error: " + e.getMessage());
+							save(batchDetailsRecord);
+
+							processStatus = false;
+							continue;
+						}
+
+						batch.setHeartBeat(new Date());
+						save(batch);
+						// save(Arrays.asList(batch, batchDetailsRecord));
+
+					} catch (DocumentException e) {
+						// cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0,
+						// 0, false, "Unable to upload the opex folder's document"));
 						batchDetailsRecord.setUploadedToOmniDocs(3);
 						batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
-						batchDetailsRecord.setUploadedToOmniDocsComment("The Document size is 0 or file is corrupted");
-						
-						processStatus = false;
-						continue;
-
-					}
-					
-					Document addedDocument = omniService.getDocumentUtility().add(files[i], addedFolder.getFolderIndex());
-
-					batchDetailsRecord.setNumberOfArchivedImages(addedDocument.getNoOfPages());
-					batchDetailsRecord.setUploadedToOmniDocs(1);
-					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
-					batchDetailsRecord.setUploadedToOmniDocsComment(null);
-					save(batchDetailsRecord);
-					
-					/**
-					 * 
-					 * move the opex folder 
-					 * 
-					 * update batch heartbeat by now 
-					 **/
-					try {
-						/* move the folder to uploaded and delete from opex folder */
-						String foldername = batchDetailsRecord.getSerialNumber().toString() + "%" + batchDetailsRecord.getPart();
-	
-						String scannerdistt = props.getProperty("opex.scanner.output") + System.getProperty("file.separator") + foldername; /* ex: D:/Scanner_out/0000023+01+018%1 */
-	
-						File opexFldr = new File(scannerdistt);
-	
-						moveOpexFoler(opexFldr);
-					
-					}catch (IOException e) {
-						// Unable To Move the folder to opex folder
-						batchDetailsRecord.setUploadedToOmniDocsComment(e.getMessage());
-						batchDetailsRecord.setUploadedToOmniDocs(4);
-						batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+						batchDetailsRecord.setUploadedToOmniDocsComment("Unable to upload the opex folder's document");
 						save(batchDetailsRecord);
-						
+
 						processStatus = false;
 						continue;
-					}		
-					
-					batch.setHeartBeat(new Date());
-					
-					save(Arrays.asList(batch, batchDetailsRecord));
-					
-				} catch (DocumentException e) {
-					//cspdEM.persist(new ProcessLog(new Date(), batchID, opexFolder.getName(), 0, 0, false, "Unable to upload the opex folder's document"));
-					batchDetailsRecord.setUploadedToOmniDocs(3);
-					batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
-					batchDetailsRecord.setUploadedToOmniDocsComment("Unable to upload the opex folder's document");
-					
-					save(batchDetailsRecord);
 
-					processStatus = false;
-					continue;
-					
-				} 
-	
-			
+					} catch (Exception e) {
+						batchDetailsRecord.setUploadedToOmniDocs(3);
+						batchDetailsRecord.setUploadedToOmniDocsDate(new Date());
+						batchDetailsRecord.setUploadedToOmniDocsComment("Unknown Error: " + e.getMessage());
+						save(batchDetailsRecord);
+
+						processStatus = false;
+						continue;
+					}
+
+				}
 			}
+
+			if (processStatus == true) {
+
+				batch.setUploadedToOmniDocs(1);
+
+				batch.setUploadedToOmniDocsDate(new Date());
+
+			} else {
+
+				batch.setUploadedToOmniDocs(3);// fail status
+
+				batch.setUploadedToOmniDocsDate(new Date());
+			}
+
+			save(batch);
+
+		} catch (Exception e) {
+			try {
+				Files.write(Paths.get("unknown-logs.txt"), ("\n\nuploadByBatchId...\n" +e.getMessage()).getBytes(), StandardOpenOption.APPEND);
+			}catch(Exception ex) {}
+
+		} finally {
+
+			closeResourcesAndExit();
+
 		}
 
-		if (processStatus == true) {
-			
-			batch.setUploadedToOmniDocs(1);
-
-			batch.setUploadedToOmniDocsDate(new Date());
-
-		}else {
-			
-			batch.setUploadedToOmniDocs(3);//fail status
-			
-			batch.setUploadedToOmniDocsDate(new Date());
-		}
-
-		save(batch);
-
-		closeResourcesAndExit();
-		
 	}
-	
-	
-	private static void save(Object entity){
-		
+
+	private static void save(Object entity) {
+
 		cspdEM.getTransaction().begin();
-		
+
 		cspdEM.persist(entity);
-		
+
 		cspdEM.getTransaction().commit();
 
 	}
-	
-	private static void save(List entities){
-		
+
+	private static void save(List entities) {
+
 		cspdEM.getTransaction().begin();
-		
+
 		for (Iterator entity = entities.iterator(); entity.hasNext();) {
 			cspdEM.persist(entity.next());
 		}
@@ -369,17 +409,16 @@ public class CspdMain {
 
 	}
 
+	private static void moveOpexFoler(File opexFolder) throws IOException {
 
-	private static void moveOpexFoler(File opexFolder) throws IOException{
-		
-		/*move to backup folder if exist create new one with current date  */
-		
+		/* move to backup folder if exist create new one with current date */
+
 		String backupFolder = props.getProperty("omnidocs.transferDest");
-		File backUp = new File(backupFolder+ System.getProperty("file.separator") +opexFolder.getName());
-		
+		File backUp = new File(backupFolder + System.getProperty("file.separator") + opexFolder.getName());
+
 		/* Backup the folder */
 		moveToBackupFolder(backUp);
-		
+
 		/* Move all folder contents */
 		uploadCleanup(opexFolder);
 
@@ -393,14 +432,14 @@ public class CspdMain {
 			String currentDateTime = simpleDateFormat.format(System.currentTimeMillis());
 
 			boolean isRenamed = transferFolder.renameTo(new File((transferFolder + " - " + currentDateTime)));
-			if(!isRenamed) {
+			if (!isRenamed) {
 				throw new IOException("Unable to backup the existing old opex folder");
 			}
-			
+
 		}
 
 		boolean isCreated = transferFolder.mkdir();
-		if(!isCreated) {
+		if (!isCreated) {
 			throw new IOException("Unable to create a new folder to backup the existing old opex folder");
 		}
 
@@ -410,13 +449,13 @@ public class CspdMain {
 
 		// after the upload delete the uploaded opex folder and move to backup folder
 		String transferFolderDest = props.getProperty("omnidocs.transferDest");
-				
+
 		File[] files = opexFolder.listFiles();
 		for (int i = 0; i < files.length; i++) {
 
 			try {
-				 Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") 
-				 	+opexFolder.getPath().substring(opexFolder.getPath().lastIndexOf('\\')) + System.getProperty("file.separator") + files[i].getName()).toPath(),StandardCopyOption.REPLACE_EXISTING);
+				Files.move(files[i].toPath(), new File(transferFolderDest + System.getProperty("file.separator") + opexFolder.getPath().substring(opexFolder.getPath().lastIndexOf('\\'))
+						+ System.getProperty("file.separator") + files[i].getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
 
 			} catch (IOException e) {
 				new IOException("Error in moving the opex folder");
@@ -424,7 +463,7 @@ public class CspdMain {
 		}
 
 		boolean isDeleted = opexFolder.delete();
-		if(!isDeleted) {
+		if (!isDeleted) {
 			throw new IOException("Unable to delete the opex folder during the moving from the opex source folder");
 		}
 	}
@@ -596,8 +635,7 @@ public class CspdMain {
 				+ "	   dbo.GetFilePrefix(bd.FileNumber, b.FileType) AS Prefix, bd.Year, dbo.GetNewSerial(bd.SerialNumber) AS SerialNumber, "
 				+ "	   bd.Part, bd.FirstName, bd.SecondName, bd.ThirdName, bd.FamilyName, bd.FileNumber, "
 				+ "	   dbo.GetFolderClassCode(bd.SerialNumber) AS FolderClassCode, dbo.GetFolderClassText(bd.SerialNumber) AS FolderClassText  " + " FROM Batches b  "
-				+ "	 INNER JOIN BatchDetails bd  ON b.Id=bd.BatchId  INNER JOIN OldOffices oe  ON b.OldOfficeCode = oe.OfficeCode  "
-				+ " WHERE SerialNumber = :serialNumber AND Part = :part ";
+				+ "	 INNER JOIN BatchDetails bd  ON b.Id=bd.BatchId  INNER JOIN OldOffices oe  ON b.OldOfficeCode = oe.OfficeCode  " + " WHERE SerialNumber = :serialNumber AND Part = :part ";
 
 		Query cspdMetadataQuery = cspdEM.createNativeQuery(metadataQuery, "CspdMetadataMapping");
 		cspdMetadataQuery.setParameter("serialNumber", serialNumber);
@@ -630,94 +668,94 @@ public class CspdMain {
 
 		prepareResources();
 
-		String changedFolders = null;
+		try {
+				
+			String changedFolders = null;
 
-		changedFolders = "SELECT DISTINCT SUBSDIARYOBJECTNAME AS folderName , " + "	SUBSDIARYOBJECTID            AS folderIndex  " + "FROM PDBNEWAUDITTRAIL_TABLE A , "
-				+ "	PDBFOLDER F  " + "WHERE USERINDEX IN (SELECT USERINDEX  " + "					FROM PDBGROUPMEMBER  "
-				+ "					WHERE GROUPINDEX = (SELECT GROUPINDEX  " + "										FROM PDBGROUP  "
-				+ "										WHERE GROUPNAME LIKE 'Quality%'))  "
-				+ (omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:")
-						? "	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD')  AND TO_DATE(:endDate, 'YYYY-MM-DD') "
-						: "	AND DATETIME BETWEEN CONVERT(Date, :startDate, 111) AND CONVERT(Date, :endDate, 111)   ")
-				+ "	AND DATETIME > (SELECT MAX(CREATEDDATETIME)  " + "					FROM PDBFOLDER  " + "					WHERE FOLDERINDEX = SUBSDIARYOBJECTID)  "
-				+ "	AND SUBSDIARYOBJECTID IN (	SELECT FOLDERINDEX  " + "								FROM PDBFOLDER P  "
-				+ "								WHERE P.PARENTFOLDERINDEX IN :indexes AND "
-				+ (omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:") ? " A.COMMNT " : " A.COMMENT ")
-				+ "									NOT LIKE '%Trash%'  " + "								AND ACTIONID NOT IN (204) )  " + "UNION  "
-				+ "SELECT DISTINCT F.NAME AS folderName, " + "	ACTIVEOBJECTID  AS folderIndex  " + "FROM PDBNEWAUDITTRAIL_TABLE A , " + "	PDBFOLDER F  "
-				+ "WHERE USERINDEX IN (SELECT USERINDEX  " + "					FROM PDBGROUPMEMBER  " + "					WHERE GROUPINDEX = (SELECT GROUPINDEX  "
-				+ "										FROM PDBGROUP  " + "										WHERE GROUPNAME LIKE 'Quality%' ))  "
-				+ (omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:")
-						? "	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD') AND TO_DATE(:endDate, 'YYYY-MM-DD') "
-						: "	AND DATETIME BETWEEN CONVERT(Date, :startDate, 111) AND CONVERT(Date, :endDate, 111)   ")
-				+ "	AND DATETIME > (SELECT MAX( CREATEDDATETIME)  " + "					FROM PDBFOLDER  " + "					WHERE FOLDERINDEX = ACTIVEOBJECTID)  "
-				+ "	AND SUBSDIARYOBJECTID = -1  " + "	AND F.FOLDERINDEX = ACTIVEOBJECTID  " + "	AND CATEGORY = 'F'  " + "	AND ACTIVEOBJECTID IN (	SELECT FOLDERINDEX  "
-				+ "							FROM PDBFOLDER P  " + "							WHERE P.PARENTFOLDERINDEX IN :indexes  AND "
-				+ (omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:") ? " A.COMMNT " : " A.COMMENT ")
-				+ "								NOT LIKE '%Trash%'  " + "								AND ACTIONID NOT IN (204))";
+			changedFolders = "SELECT DISTINCT SUBSDIARYOBJECTNAME AS folderName , " + "	SUBSDIARYOBJECTID            AS folderIndex  " + "FROM PDBNEWAUDITTRAIL_TABLE A , " + "	PDBFOLDER F  "
+					+ "WHERE USERINDEX IN (SELECT USERINDEX  " + "					FROM PDBGROUPMEMBER  " + "					WHERE GROUPINDEX = (SELECT GROUPINDEX  "
+					+ "										FROM PDBGROUP  " + "										WHERE GROUPNAME LIKE 'Quality%'))  "
+					+ (omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:")
+							? "	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD')  AND TO_DATE(:endDate, 'YYYY-MM-DD') "
+							: "	AND DATETIME BETWEEN CONVERT(Date, :startDate, 111) AND CONVERT(Date, :endDate, 111)   ")
+					+ "	AND DATETIME > (SELECT MAX(CREATEDDATETIME)  " + "					FROM PDBFOLDER  " + "					WHERE FOLDERINDEX = SUBSDIARYOBJECTID)  "
+					+ "	AND SUBSDIARYOBJECTID IN (	SELECT FOLDERINDEX  " + "								FROM PDBFOLDER P  "
+					+ "								WHERE P.PARENTFOLDERINDEX IN :indexes AND "
+					+ (omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:") ? " A.COMMNT " : " A.COMMENT ")
+					+ "									NOT LIKE '%Trash%'  " + "								AND ACTIONID NOT IN (204) )  " + "UNION  " + "SELECT DISTINCT F.NAME AS folderName, "
+					+ "	ACTIVEOBJECTID  AS folderIndex  " + "FROM PDBNEWAUDITTRAIL_TABLE A , " + "	PDBFOLDER F  " + "WHERE USERINDEX IN (SELECT USERINDEX  "
+					+ "					FROM PDBGROUPMEMBER  " + "					WHERE GROUPINDEX = (SELECT GROUPINDEX  " + "										FROM PDBGROUP  "
+					+ "										WHERE GROUPNAME LIKE 'Quality%' ))  "
+					+ (omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:")
+							? "	AND DATETIME BETWEEN TO_DATE(:startDate, 'YYYY-MM-DD') AND TO_DATE(:endDate, 'YYYY-MM-DD') "
+							: "	AND DATETIME BETWEEN CONVERT(Date, :startDate, 111) AND CONVERT(Date, :endDate, 111)   ")
+					+ "	AND DATETIME > (SELECT MAX( CREATEDDATETIME)  " + "					FROM PDBFOLDER  " + "					WHERE FOLDERINDEX = ACTIVEOBJECTID)  "
+					+ "	AND SUBSDIARYOBJECTID = -1  " + "	AND F.FOLDERINDEX = ACTIVEOBJECTID  " + "	AND CATEGORY = 'F'  " + "	AND ACTIVEOBJECTID IN (	SELECT FOLDERINDEX  "
+					+ "							FROM PDBFOLDER P  " + "							WHERE P.PARENTFOLDERINDEX IN :indexes  AND "
+					+ (omniEM.getEntityManagerFactory().getProperties().get("javax.persistence.jdbc.url").toString().contains(":oracle:") ? " A.COMMNT " : " A.COMMENT ")
+					+ "								NOT LIKE '%Trash%'  " + "								AND ACTIONID NOT IN (204))";
 
-		List<Integer> indexes = Arrays.asList(Integer.valueOf(props.getProperty("opex.type.1")), Integer.valueOf(props.getProperty("opex.type.2")),
-				Integer.valueOf(props.getProperty("opex.type.3")), Integer.valueOf(props.getProperty("opex.type.4")), Integer.valueOf(props.getProperty("opex.type.5")));
+			List<Integer> indexes = Arrays.asList(Integer.valueOf(props.getProperty("opex.type.1")), Integer.valueOf(props.getProperty("opex.type.2")),
+					Integer.valueOf(props.getProperty("opex.type.3")), Integer.valueOf(props.getProperty("opex.type.4")), Integer.valueOf(props.getProperty("opex.type.5")));
 
-		Query changeFolderQ = omniEM.createNativeQuery(changedFolders, "ChangedFoldersMapping");
-		changeFolderQ.setParameter("startDate", startDate);
-		changeFolderQ.setParameter("endDate", endDate);
-		changeFolderQ.setParameter("indexes", indexes);
+			Query changeFolderQ = omniEM.createNativeQuery(changedFolders, "ChangedFoldersMapping");
+			changeFolderQ.setParameter("startDate", startDate);
+			changeFolderQ.setParameter("endDate", endDate);
+			changeFolderQ.setParameter("indexes", indexes);
 
-		List<ModifiedFolder> modifiedFolders = changeFolderQ.getResultList();
+			List<ModifiedFolder> modifiedFolders = changeFolderQ.getResultList();
 
-		cspdEM.getTransaction().begin();
-		for (int i = 0; i < modifiedFolders.size(); i++) {
+			cspdEM.getTransaction().begin();
+			for (int i = 0; i < modifiedFolders.size(); i++) {
 
-			String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + modifiedFolders.get(i).getFolderName();
-			File transferFolder = new File(transferFolderDest);
+				String transferFolderDest = props.getProperty("omnidocs.transferDest") + System.getProperty("file.separator") + modifiedFolders.get(i).getFolderName();
+				File transferFolder = new File(transferFolderDest);
 
-			moveToBackupFolder(transferFolder);
+				moveToBackupFolder(transferFolder);
 
-			OmniDocumentUtility omniDocumentUtility = omniService.getDocumentUtility();
+				OmniDocumentUtility omniDocumentUtility = omniService.getDocumentUtility();
 
-			List<Document> docList = omniDocumentUtility.getDocumentList(modifiedFolders.get(i).getFolderIndex(), false);
-			for (int j = 0; j < docList.size(); j++) {
-				String documentDest = transferFolderDest + System.getProperty("file.separator") + docList.get(j).getDocumentName() + "." + docList.get(j).getCreatedByAppName();
+				List<Document> docList = omniDocumentUtility.getDocumentList(modifiedFolders.get(i).getFolderIndex(), false);
+				for (int j = 0; j < docList.size(); j++) {
+					String documentDest = transferFolderDest + System.getProperty("file.separator") + docList.get(j).getDocumentName() + "." + docList.get(j).getCreatedByAppName();
 
-				omniDocumentUtility.exportByIndex(documentDest, docList.get(j).getDocumentIndex());
+					omniDocumentUtility.exportByIndex(documentDest, docList.get(j).getDocumentIndex());
 
-				String folderName = modifiedFolders.get(i).getFolderName();
+					String folderName = modifiedFolders.get(i).getFolderName();
 
-				String partialBaseIdentifier = folderName.contains("%") ? folderName.substring(0, folderName.indexOf("%")) : folderName;
-				String partialBaseIdentifierPart = folderName.contains("%") ? folderName.substring(folderName.indexOf("%") + 1) : "1";
+					String partialBaseIdentifier = folderName.contains("%") ? folderName.substring(0, folderName.indexOf("%")) : folderName;
+					String partialBaseIdentifierPart = folderName.contains("%") ? folderName.substring(folderName.indexOf("%") + 1) : "1";
 
-				TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findBySerialNumberAndPart", BatchDetails.class);
-				batchDetailsTypeQuery.setParameter("serialNumber", partialBaseIdentifier);
-				batchDetailsTypeQuery.setParameter("part", Integer.valueOf(partialBaseIdentifierPart));
+					TypedQuery<BatchDetails> batchDetailsTypeQuery = cspdEM.createNamedQuery("BatchDetails.findBySerialNumberAndPart", BatchDetails.class);
+					batchDetailsTypeQuery.setParameter("serialNumber", partialBaseIdentifier);
+					batchDetailsTypeQuery.setParameter("part", Integer.valueOf(partialBaseIdentifierPart));
 
-				List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
-				for (Iterator<BatchDetails> iterator = batchDetails.iterator(); iterator.hasNext();) {
-					BatchDetails batchDetailsElem = iterator.next();
-	
-					batchDetailsElem.setNumberOfArchivedImages(new Integer(docList.get(j).getNoOfPages()));
-					batchDetailsElem.setUploadedToOmniDocs(2);
-					batchDetailsElem.setUploadedToOmniDocsDate(new Date());
-					
-					cspdEM.persist(batchDetailsElem);
-					
+					List<BatchDetails> batchDetails = batchDetailsTypeQuery.getResultList();
+					for (Iterator<BatchDetails> iterator = batchDetails.iterator(); iterator.hasNext();) {
+						BatchDetails batchDetailsElem = iterator.next();
+
+						batchDetailsElem.setNumberOfArchivedImages(new Integer(docList.get(j).getNoOfPages()));
+						batchDetailsElem.setUploadedToOmniDocs(2);
+						batchDetailsElem.setUploadedToOmniDocsDate(new Date());
+
+						cspdEM.persist(batchDetailsElem);
+
+					}
 				}
+
 			}
 
-//			TypedQuery<ProcessLog> typedProcessLog = cspdEM.createNamedQuery("ProcessLog.findLastBI", ProcessLog.class);
-//			typedProcessLog.setParameter("serialNumber", modifiedFolders.get(i).getFolderName());
-//			try {
-//				ProcessLog processLog = typedProcessLog.getSingleResult();
-//				processLog.setUploadedToDocuWare(2);
-//				cspdEM.persist(processLog);
-//			} catch (Exception e) {
-//			}
+			cspdEM.getTransaction().commit();
 
+		} catch (Exception e) {
+			try {
+				Files.write(Paths.get("unknown-logs.txt"), ("\n\nsync...\n" +e.getMessage()).getBytes(), StandardOpenOption.APPEND);
+			}catch(Exception ex) {}
+
+
+		} finally {
+			closeResourcesAndExit();
 		}
-
-		cspdEM.getTransaction().commit();
-
-		closeResourcesAndExit();
 
 	}
 
@@ -765,8 +803,7 @@ public class CspdMain {
 			System.out.println("folders : " + folders.size());
 			for (Folder folder : folders) {
 
-				String partialBaseIdentifier = folder.getFolderName().contains("%") ? folder.getFolderName().substring(0, folder.getFolderName().indexOf("%"))
-						: folder.getFolderName();
+				String partialBaseIdentifier = folder.getFolderName().contains("%") ? folder.getFolderName().substring(0, folder.getFolderName().indexOf("%")) : folder.getFolderName();
 
 				String partialBaseIdentifierPart = folder.getFolderName().contains("%") ? folder.getFolderName().substring(folder.getFolderName().indexOf("%") + 1) : "1";
 
@@ -784,16 +821,17 @@ public class CspdMain {
 						cspdEM.persist(batchDetailsElem);
 						cspdEM.getTransaction().commit();
 
-						System.out.println("SerialNumber : " + batchDetailsElem.getSerialNumber() + "\t / Archived PDF Pages : " + batchDetailsElem.getNumberOfArchivedImages()
-								+ "\t / Updated Successfully.");
+						System.out.println(
+								"SerialNumber : " + batchDetailsElem.getSerialNumber() + "\t / Archived PDF Pages : " + batchDetailsElem.getNumberOfArchivedImages() + "\t / Updated Successfully.");
 
 					}
 				}
 			}
 
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			try {
+				Files.write(Paths.get("unknown-logs.txt"), ("\n\nupdatePDFPages...\n" +e.getMessage()).getBytes(), StandardOpenOption.APPEND);
+			}catch(Exception ex) {}
 
 		} finally {
 
