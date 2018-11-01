@@ -3,7 +3,6 @@ package cspd;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -17,7 +16,9 @@ import java.util.List;
 import java.util.Properties;
 
 import javax.persistence.EntityManager;
+import javax.persistence.ParameterMode;
 import javax.persistence.Query;
+import javax.persistence.StoredProcedureQuery;
 import javax.persistence.TypedQuery;
 
 import com.etech.queue.OpexReaderJob;
@@ -631,7 +632,7 @@ public class CspdMain {
 
 	private static CspdMetadata fetchCspdMetadata(String serialNumber, int part) throws Exception {
 
-		String metadataQuery = "SELECT b.OfficeCode, oe.OfficeName, b.FileType, dbo.GetFileOldSerial(bd.FileNumber, b.FileType) AS OldSerial, "
+/*  	String metadataQuery = "SELECT b.OfficeCode, oe.OfficeName, b.FileType, dbo.GetFileOldSerial(bd.FileNumber, b.FileType) AS OldSerial, "
 				+ "	   dbo.GetFilePrefix(bd.FileNumber, b.FileType) AS Prefix, bd.Year, dbo.GetNewSerial(bd.SerialNumber) AS SerialNumber, "
 				+ "	   bd.Part, bd.FirstName, bd.SecondName, bd.ThirdName, bd.FamilyName, bd.FileNumber, "
 				+ "	   dbo.GetFolderClassCode(bd.SerialNumber) AS FolderClassCode, dbo.GetFolderClassText(bd.SerialNumber) AS FolderClassText  " + " FROM Batches b  "
@@ -640,6 +641,12 @@ public class CspdMain {
 		Query cspdMetadataQuery = cspdEM.createNativeQuery(metadataQuery, "CspdMetadataMapping");
 		cspdMetadataQuery.setParameter("serialNumber", serialNumber);
 		cspdMetadataQuery.setParameter("part", part);
+*/		
+		StoredProcedureQuery cspdMetadataQuery = cspdEM.createStoredProcedureQuery("GetMetadata", "CspdMetadataMapping");
+		cspdMetadataQuery.registerStoredProcedureParameter(1, String.class, ParameterMode.IN);
+		cspdMetadataQuery.registerStoredProcedureParameter(2, Integer.class, ParameterMode.IN);
+		cspdMetadataQuery.setParameter(1, serialNumber);
+		cspdMetadataQuery.setParameter(2, part);
 
 		List<CspdMetadata> metadata = cspdMetadataQuery.getResultList();
 
